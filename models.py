@@ -63,6 +63,14 @@ class DNN(torch.nn.Module):
             x = x.reshape(x.size(0), self.input_size)
             return self.layers(x)
 
+# helper class for passing values
+class Same():
+    def __init__(self):
+        super(Same, self).__init__()
+
+    def forward(self, x):
+        return x
+    
 # helper class for CNN
 class ConvUnit(nn.Sequential):
 
@@ -94,7 +102,7 @@ class CNN(nn.Module):
             nn.Dropout(inplace=True) if dropout else Identity(),
             Conv(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
             Conv(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
-            Conv(n_filter2, n_filter2, kernel_size=3, stride=2, padding=1, batch_norm=batch_norm),  # 14
+            Conv(n_filter2, n_filter2, kernel_size=3, stride=2, padding=1, batch_norm=batch_norm), 
             nn.Dropout(inplace=True) if dropout else Identity(),
             Conv(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
             Conv(n_filter2, n_filter2, kernel_size=1, stride=1, batch_norm=batch_norm),
