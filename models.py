@@ -33,8 +33,12 @@ class LogisticRegression(torch.nn.Module):
 
     def forward(self, x):
         outputs = self.linear(x)
-        outputs = F.sigmoid(output)
+        outputs = F.sigmoid(outputs)
         return outputs
+
+
+
+
 
 # DNN model
 class DNN(torch.nn.Module):
@@ -65,6 +69,7 @@ class DNN(torch.nn.Module):
 
 # helper class for passing values
 class Same():
+
     def __init__(self):
         super(Same, self).__init__()
 
@@ -91,6 +96,7 @@ class ConvUnit(nn.Sequential):
         super(Conv, self).__init__(*model)
 
 class CNN(nn.Module):
+
     def __init__(self, filters_percentage=1., n_channels=3, num_classes=10, dropout=False, batch_norm=True):
         super(AllCNN, self).__init__()
         n_filter1 = int(96 * filters_percentage)
