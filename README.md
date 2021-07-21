@@ -5,5 +5,5 @@ Learn to forget: Realizing data removal in Machine Learning Models
 ### Papers:
 
 ### Code: 
-https://github.com/AdityaGolatkar/SelectiveForgetting
-https://github.com/oval-group/dfw
+1. https://github.com/AdityaGolatkar/SelectiveForgetting
+1. https://github.com/oval-group/dfw
