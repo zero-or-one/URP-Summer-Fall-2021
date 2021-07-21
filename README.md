@@ -2,5 +2,8 @@
 Learn to forget: Realizing data removal in Machine Learning Models
 
 ## Reference
-Project design and some parts are picked from:
+# Papers:
+
+# Code: 
 https://github.com/AdityaGolatkar/SelectiveForgetting
+https://github.com/oval-group/dfw
