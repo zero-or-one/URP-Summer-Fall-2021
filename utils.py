@@ -21,10 +21,3 @@ def save_state(model, optimizer, filename):
 
 def log_metrics(split, metrics, epoch, **kwargs):
     print(f'[{epoch}] {split} metrics:' + json.dumps(metrics.avg))
-
-def new_dir(directory):
-    try:
-        os.makedirs(directory)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
