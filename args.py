@@ -1,7 +1,10 @@
+# it is not usable with jupyter notebook
+# so not worth to utilize
+'''
 import os
 from argparse
 
-'''modify it later'''
+#modify it later
 def parse_args():
     parser = argparse.ArgumentParser()
     _add_dataset_parser(parser)
@@ -160,7 +163,9 @@ def filter_args(args):
 
     if args.dataset == 'cifar10':
         args.n_classes = 10
-    elif args.dataset == 'cifar100':
+    elif args.dataset == 'cifar':
         args.n_classes = 100
     elif args.dataset == 'snli':
         args.n_classes = 3
+
+'''

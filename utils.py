@@ -5,7 +5,6 @@ import os
 import json
 import errno
 
-
 def set_seed(seed):
     if seed is None:
         np.random.seed(None)

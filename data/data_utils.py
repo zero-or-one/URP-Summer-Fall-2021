@@ -8,7 +8,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 import torch.utils.data as data
-
+from matplotlib import pyplot as plt
 
 # get subset by indices
 # it exists by default, redefined for comfort
@@ -41,7 +41,7 @@ class Subset(data.Dataset):
         else:
             return self.dataset[self.indices[idx]]
 
- # get random indices of certain size with unique option
+# get random indices of certain size with unique option
 def random_part(sizes, num, seed=None, unique=True):
     # save current random state
     state = np.random.get_state()
@@ -61,7 +61,37 @@ def random_part(sizes, num, seed=None, unique=True):
     np.random.set_state(state)
     return res
 
+# show several random images
+def show_random(dataset, num):
+    n_samples = len(dataset)
+    i = 0
+    for test_images, test_labels in dataset:
+        rand_idx = int(np.random.random() * n_samples)
+        sample_image = test_images[rand_idx]    # Reshape them according to your needs.
+        sample_label = test_labels[rand_idx]
+        img = sample_image.view(32, 32)
+        plt.tittle(sample_label)
+        plt.axis('off')
+        plt.imshow(img)
+        i += 1
+        if i >= num: break
+    plt.show()
+
 # Transforms
+def general_transforms(train=True):
+    transform_train = transforms.Compose([
+        transforms.Resize(size=(32, 32)),
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+    transform = transform_train if train else transform_test
+    return transform
 
 def mnist_transform(train=True):
     transform_train = transforms.Compose([
@@ -75,4 +105,36 @@ def mnist_transform(train=True):
     ])
     transform = transform_train if train else transform_test
     return transform
+
+def cifar_transforms(train=True):
+    transform_train = transforms.Compose([
+        transforms.Pad(padding=4, fill=(125,123,113)),
+        transforms.RandomCrop(32, padding=0),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+    transform = transform_train if train else transform_test
+    return transform
+
+def imagenet_transforms(train=True):
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(64, padding=4),
+        transforms.Resize(size=(32, 32)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    ])
+    transform_test = transforms.Compose([
+        transforms.Resize(size=(32, 32)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    ])
+    transform = transform_train if train else transform_test
+    return transform
+
 

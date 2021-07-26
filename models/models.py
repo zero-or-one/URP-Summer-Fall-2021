@@ -1,6 +1,11 @@
 import numpy as np
 import torch
-from torch.nn import functional as F
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.nn import init
+from torch.nn.parameter import Parameter
+from torch.autograd import Variable
+
 
 # linear regression model
 class LinearRegression(torch.nn.Module):
@@ -35,10 +40,6 @@ class LogisticRegression(torch.nn.Module):
         outputs = self.linear(x)
         outputs = F.sigmoid(outputs)
         return outputs
-
-
-
-
 
 # DNN model
 class DNN(torch.nn.Module):
@@ -102,16 +103,16 @@ class CNN(nn.Module):
         n_filter1 = int(96 * filters_percentage)
         n_filter2 = int(192 * filters_percentage)
         self.features = nn.Sequential(
-            Conv(n_channels, n_filter1, kernel_size=3, batch_norm=batch_norm),
-            Conv(n_filter1, n_filter1, kernel_size=3, batch_norm=batch_norm),
-            Conv(n_filter1, n_filter2, kernel_size=3, stride=2, padding=1, batch_norm=batch_norm),
+            ConvUnit(n_channels, n_filter1, kernel_size=3, batch_norm=batch_norm),
+            ConvUnit(n_filter1, n_filter1, kernel_size=3, batch_norm=batch_norm),
+            ConvUnit(n_filter1, n_filter2, kernel_size=3, stride=2, padding=1, batch_norm=batch_norm),
             nn.Dropout(inplace=True) if dropout else Identity(),
-            Conv(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
-            Conv(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
-            Conv(n_filter2, n_filter2, kernel_size=3, stride=2, padding=1, batch_norm=batch_norm), 
+            ConvUnit(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
+            ConvUnit(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
+            ConvUnit(n_filter2, n_filter2, kernel_size=3, stride=2, padding=1, batch_norm=batch_norm),
             nn.Dropout(inplace=True) if dropout else Identity(),
-            Conv(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
-            Conv(n_filter2, n_filter2, kernel_size=1, stride=1, batch_norm=batch_norm),
+            ConvUnit(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
+            ConvUnit(n_filter2, n_filter2, kernel_size=1, stride=1, batch_norm=batch_norm),
             nn.AvgPool2d(8),
             Flatten(),
         )
@@ -124,37 +125,34 @@ class CNN(nn.Module):
         output = self.classifier(features)
         return output
 
-def get_model(args):
-    assert args.dataset in ('cifar10', 'cifar100')
+class ResNet18(nn.Module):
+    def __init__(self, filters_percentage=1.0, n_channels = 3, num_classes=10, block=_ResBlock, num_blocks=[2,2,2,2], n_classes=10):
+        super(ResNet18, self).__init__()
+        self.in_planes = 64
 
-    if args.densenet:
-        model = DenseNet3(args.depth, args.n_classes, args.growth, bottleneck=bool(args.bottleneck))
-    elif args.wrn:
-        model = WideResNet(args.depth, args.n_classes, args.width)
-    else:
-        raise NotImplementedError
+        self.conv1 = conv3x3(n_channels,64)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.layer1 = self._make_layer(block, int(64*filters_percentage), num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, int(128*filters_percentage), num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, int(256*filters_percentage), num_blocks[2], stride=2)
+        self.layer4 = self._make_layer(block, int(512*filters_percentage), num_blocks[3], stride=2)
+        self.linear = nn.Linear(int(512*filters_percentage)*block.expansion, num_classes)
 
-    if args.load_model:
-        state = torch.load(args.load_model)['model']
-        new_state = OrderedDict()
-        for k in state:
-            # naming convention for data parallel
-            if 'module' in k:
-                v = state[k]
-                new_state[k.replace('module.', '')] = v
-            else:
-                new_state[k] = state[k]
-        model.load_state_dict(new_state)
-        print('Loaded model from {}'.format(args.load_model))
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+        return nn.Sequential(*layers)
 
-    # Number of model parameters
-    args.nparams = sum([p.data.nelement() for p in model.parameters()])
-    print('Number of model parameters: {}'.format(args.nparams))
-
-    if args.cuda:
-        if args.parallel_gpu:
-            model = torch.nn.DataParallel(model).cuda()
-        else:
-            model = model.cuda()
-
-    return model
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = F.avg_pool2d(out, 4)
+        out = out.view(out.size(0), -1)
+        out = self.linear(out)
+        return out

@@ -62,13 +62,12 @@ def create_loaders(dataset_train, dataset_val, dataset_test,
 
     return train, val, test
 
-
+# define each dataset
 def mnist(dataset, batch_size=28, cuda=0,
                   train_size=50, val_size=10, test_size=10,
                   test_batch_size=10, **kwargs):
 
     assert dataset == 'mnist'
-    #root = '{}/{}'.format(os.environ['VISION_DATA'], dataset)
 
     dataset_train = datasets.MNIST(root=root, train=True, transform=mnist_transform(), download=True)
     dataset_val = datasets.MNIST(root=root, train=True, transform=mnist_transform(False))
@@ -80,96 +79,46 @@ def mnist(dataset, batch_size=28, cuda=0,
                           test_batch_size=test_batch_size,
                           cuda=cuda, num_workers=0)
 
-'''
-def loaders_cifar(dataset, batch_size, cuda,
+def cifar(dataset, batch_size, cuda,
                   train_size=45000, augment=True, val_size=5000, test_size=10000,
                   test_batch_size=128, **kwargs):
 
     assert dataset in ('cifar10', 'cifar100')
 
-    root = '{}/{}'.format(os.environ['VISION_DATA'], dataset)
 
-    # Data loading code
-    mean = [125.3, 123.0, 113.9]
-    std = [63.0, 62.1, 66.7]
-    normalize = transforms.Normalize(mean=[x / 255.0 for x in mean],
-                                     std=[x / 255.0 for x in std])
-
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        normalize])
-
-    if augment:
-        print('Using data augmentation on CIFAR data set.')
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize])
-    else:
-        print('Not using data augmentation on CIFAR data set.')
-        transform_train = transform_test
-
-    # define two datasets in order to have different transforms
-    # on training and validation (no augmentation on validation)
     dataset = datasets.CIFAR10 if dataset == 'cifar10' else datasets.CIFAR100
     dataset_train = dataset(root=root, train=True,
-                            transform=transform_train)
+                            transform=cifar_transform(True))
     dataset_val = dataset(root=root, train=True,
-                          transform=transform_test)
+                          transform=cifar_transform(False))
     dataset_test = dataset(root=root, train=False,
-                           transform=transform_test)
+                           transform=cifar_transform(False))
 
     return create_loaders(dataset_train, dataset_val,
                           dataset_test, train_size, val_size, test_size,
                           batch_size, test_batch_size, cuda, num_workers=4)
 
 
-def loaders_svhn(dataset, batch_size, cuda,
+def imagenet(dataset, batch_size, cuda,
                  train_size=63257, augment=False, val_size=10000, test_size=26032,
                  test_batch_size=1000, **kwargs):
 
-    assert dataset == 'svhn'
+    assert dataset == 'imagenet'
 
-    root = '{}/{}'.format(os.environ['VISION_DATA'], dataset)
-
-    # Data loading code
-    mean = [0.4380, 0.4440, 0.4730]
-    std = [0.1751, 0.1771, 0.1744]
-
-    normalize = transforms.Normalize(mean=mean,
-                                     std=std)
-
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        normalize])
-
-    if augment:
-        print('Using data augmentation on SVHN data set.')
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize])
-    else:
-        print('Not using data augmentation on SVHN data set.')
-        transform_train = transform_test
-
-    # define two datasets in order to have different transforms
-    # on training and validation (no augmentation on validation)
     dataset = datasets.SVHN
     dataset_train = dataset(root=root, split='train',
-                            transform=transform_train)
+                            transform=imagenet_transforms(True))
     dataset_val = dataset(root=root, split='train',
-                          transform=transform_test)
+                          transform=imagenet_transforms(False))
     dataset_test = dataset(root=root, split='test',
-                           transform=transform_test)
+                           transform=imagenet_transforms(False))
 
     return create_loaders(dataset_train, dataset_val,
                           dataset_test, train_size, val_size, test_size,
                           batch_size, test_batch_size, cuda, num_workers=4)
+
 '''
-'''
+# get dataset from args option
 def get_dataset(args):
 
     print('Dataset: \t {}'.format(args.dataset.upper()))
@@ -198,10 +147,12 @@ def get_dataset(dataset):
 
     if dataset == 'mnist':
         loader_train, loader_val, loader_test = mnist(dataset=dataset)
-    elif 'cifar' in args.dataset:
-        loader_train, loader_val, loader_test = cifar()
-    elif args.dataset == 'svhn':
-        loader_train, loader_val, loader_test = svhn()
+    elif dataset == 'cifar':
+        loader_train, loader_val, loader_test = cifar(dataset=dataset)
+    elif dataset == 'cifar10':
+        loader_train, loader_val, loader_test = cifar10(dataset=dataset)
+    elif dataset == 'imagenet':
+        loader_train, loader_val, loader_test = imagenet(dataset=dataset)
     else:
         raise NotImplementedError
 
