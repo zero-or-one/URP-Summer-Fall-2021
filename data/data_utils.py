@@ -7,32 +7,36 @@ import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as transforms
+import torch.utils.data as data
 
 
 # get subset by indices
-class getPart(data.Dataset):
-    def __init__(self, dataset, idxs=None):
+# it exists by default, redefined for comfort
+class Subset(data.Dataset):
+    def __init__(self, dataset, indices=None):
 
-        super(getPart, self).__init__()
+        super(Subset, self).__init__()
         self.dataset = dataset
-        self.idxs = idxs
-
-        if self.idxs is not None:
-            self.size = len(self.idxs)
-            assert self.size >= 0 and \
-                self.size <= len(self.dataset), \
-                "number of indices are out of range"
+        self.indices = indices
+        self.num_samples = -1
+        if self.indices is None:
+            self.num_samples = len(self.dataset)
         else:
-            self.n_samples = len(self.dataset)
+            self.num_samples = len(self.indices)
 
-    def get_size(self):
-        return self.n_samples
+            assert self.num_samples >= 0 and \
+                self.num_samples <= len(self.dataset), \
+                "length of {} incompatible with dataset of size {}"\
+                .format(self.num_samples, len(self.dataset))
 
-    def get_item(self, idx):
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
         if torch.is_tensor(idx) and idx.dim():
             res = [self[i] for i in idx]
             return torch.stack([x[0] for x in res]), torch.LongTensor([x[1] for x in res])
-        if self.idxs is None:
+        if self.indices is None:
             return self.dataset[idx]
         else:
             return self.dataset[self.indices[idx]]
@@ -41,7 +45,7 @@ class getPart(data.Dataset):
 def random_part(sizes, num, seed=None, unique=True):
     # save current random state
     state = np.random.get_state()
-    sum_sizes = sum(size)
+    sum_sizes = sum(sizes)
     assert sum_sizes <= num, "subset size is out of range"
 
     np.random.seed(seed)

@@ -4,7 +4,7 @@ from PIL import Image
 import torchvision
 from sklearn.model_selection import train_test_split
 from torchvision.datasets import VisionDataset
-from data_prep import *
+from data_utils import *
 import torch.utils.data as data
 import torchvision.datasets as datasets
 root = os.path.expanduser('~/data')
@@ -23,7 +23,7 @@ def create_loaders(dataset_train, dataset_val, dataset_test,
                                                     seed=seed)
     else: # shuffle
         train_size = train_size if train_size is not None else len(dataset_train)
-        train_indices, = random_part((train_size,),
+        train_indices, = random_part(train_size,
                                         len(dataset_train),
                                         seed=seed)
         val_size = val_size if val_size is not None else len(dataset_val)
@@ -36,9 +36,9 @@ def create_loaders(dataset_train, dataset_val, dataset_test,
                                    len(dataset_test),
                                    seed=seed)
     # get subset of data from torch dataset
-    dataset_train = getPart(dataset_train, train_indices)
-    dataset_val = getPart(dataset_val, val_indices)
-    dataset_test = getPart(dataset_test, test_indices)
+    dataset_train = Subset(dataset_train, train_indices)
+    dataset_val = Subset(dataset_val, val_indices)
+    dataset_test = Subset(dataset_test, test_indices)
 
     print('Dataset sizes: \t train: {} \t val: {} \t test: {}'
           .format(len(dataset_train), len(dataset_val), len(dataset_test)))
@@ -63,14 +63,14 @@ def create_loaders(dataset_train, dataset_val, dataset_test,
     return train, val, test
 
 
-def mnist(dataset, batch_size=64, cuda=0,
-                  train_size=5000, val_size=1000, test_size=1000,
-                  test_batch_size=100, **kwargs):
+def mnist(dataset, batch_size=28, cuda=0,
+                  train_size=50, val_size=10, test_size=10,
+                  test_batch_size=10, **kwargs):
 
     assert dataset == 'mnist'
-    root = '{}/{}'.format(os.environ['VISION_DATA'], dataset)
+    #root = '{}/{}'.format(os.environ['VISION_DATA'], dataset)
 
-    dataset_train = datasets.MNIST(root=root, train=True, transform=mnist_transform())
+    dataset_train = datasets.MNIST(root=root, train=True, transform=mnist_transform(), download=True)
     dataset_val = datasets.MNIST(root=root, train=True, transform=mnist_transform(False))
     dataset_test = datasets.MNIST(root=root, train=False, transform=mnist_transform(False))
 
@@ -169,8 +169,8 @@ def loaders_svhn(dataset, batch_size, cuda,
                           dataset_test, train_size, val_size, test_size,
                           batch_size, test_batch_size, cuda, num_workers=4)
 '''
-
-def get_data(args):
+'''
+def get_dataset(args):
 
     print('Dataset: \t {}'.format(args.dataset.upper()))
 
@@ -191,5 +191,18 @@ def get_data(args):
     args.train_size = len(loader_train.dataset)
     args.val_size = len(loader_val.dataset)
     args.test_size = len(loader_test.dataset)
+
+    return loader_train, loader_val, loader_test
+'''
+def get_dataset(dataset):
+
+    if dataset == 'mnist':
+        loader_train, loader_val, loader_test = mnist(dataset=dataset)
+    elif 'cifar' in args.dataset:
+        loader_train, loader_val, loader_test = cifar()
+    elif args.dataset == 'svhn':
+        loader_train, loader_val, loader_test = svhn()
+    else:
+        raise NotImplementedError
 
     return loader_train, loader_val, loader_test
