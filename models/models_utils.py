@@ -2,36 +2,55 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
-def get_model(args):
-    assert args.dataset in ('cifar10', 'cifar100')
+_MODELS = {}
 
-    if args.densenet:
-        model = DenseNet3(args.depth, args.n_classes, args.growth, bottleneck=bool(args.bottleneck))
-    elif args.wrn:
-        model = WideResNet(args.depth, args.n_classes, args.width)
-    else:
-        raise NotImplementedError
+def _add_model(model_fn):
+    _MODELS[model_fn.__name__] = model_fn
+    return model_fn
 
-    if args.load_model:
-        state = torch.load(args.load_model)['model']
-        new_state = OrderedDict()
-        for k in state:
-            # naming convention for data parallel
-            if 'module' in k:
-                v = state[k]
-                new_state[k.replace('module.', '')] = v
-            else:
-                new_state[k] = state[k]
-        model.load_state_dict(new_state)
-        print('Loaded model from {}'.format(args.load_model))
+@_add_model
+def mlp(**kwargs):
+    return MLP(**kwargs)
 
-    # Number of model parameters
-    args.nparams = sum([p.data.nelement() for p in model.parameters()])
-    print('Number of model parameters: {}'.format(args.nparams))
+@_add_model
+def ntk_linear(**kwargs):
+    return NTK_Linear(**kwargs)
 
-    if args.cuda:
-        if args.parallel_gpu:
-            model = torch.nn.DataParallel(model).cuda()
-        else:
-            model = model.cuda()
-    return model
+@_add_model
+def ntk_mlp(**kwargs):
+    return NTK_MLP(**kwargs)
+
+@_add_model
+def allcnn(**kwargs):
+    return AllCNN(**kwargs)
+
+@_add_model
+def ntk_allcnn(**kwargs):
+    return ntk_AllCNN(**kwargs)
+
+@_add_model
+def allcnn_no_bn(**kwargs):
+    return AllCNN(batch_norm=False, **kwargs)
+
+@_add_model
+def resnet(**kwargs):
+    return ResNet18(**kwargs)
+
+@_add_model
+def resnet_small(**kwargs):
+    return ResNet18_small(**kwargs)
+
+@_add_model
+def wide_resnet(**kwargs):
+    return Wide_ResNet(**kwargs)
+
+@_add_model
+def is_wide_resnet(**kwargs):
+    return Wide_ResNetIS(**kwargs)
+
+@_add_model
+def ntk_wide_resnet(**kwargs):
+    return Wide_ResNetNTK(**kwargs)
+
+def get_model(name, **kwargs):
+    return _MODELS[name](**kwargs)

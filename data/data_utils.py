@@ -47,7 +47,6 @@ def random_part(sizes, num, seed=None, unique=True):
     state = np.random.get_state()
     sum_sizes = sum(sizes)
     assert sum_sizes <= num, "subset size is out of range"
-
     np.random.seed(seed)
     subset = np.random.choice(num, size=sizes,
                                     replace=(not unique))
@@ -63,19 +62,18 @@ def random_part(sizes, num, seed=None, unique=True):
 
 # show several random images
 def show_random(dataset, num):
-    n_samples = len(dataset)
-    i = 0
     for test_images, test_labels in dataset:
-        rand_idx = int(np.random.random() * n_samples)
-        sample_image = test_images[rand_idx]    # Reshape them according to your needs.
-        sample_label = test_labels[rand_idx]
-        img = sample_image.view(32, 32)
-        plt.tittle(sample_label)
-        plt.axis('off')
-        plt.imshow(img)
-        i += 1
-        if i >= num: break
-    plt.show()
+        n_samples = len(test_labels)
+        for _ in range(num):
+            rand_idx = int(np.random.random() * n_samples)
+            sample_image = test_images[rand_idx]
+            sample_label = test_labels[rand_idx]
+            print(sample_image.size())
+            img = sample_image.view(32, 32, -1)
+            print("Label: ", sample_label)
+            plt.axis('off')
+            plt.imshow(img)
+            plt.show()
 
 # Transforms
 def general_transforms(train=True):
@@ -106,7 +104,7 @@ def mnist_transform(train=True):
     transform = transform_train if train else transform_test
     return transform
 
-def cifar_transforms(train=True):
+def cifar_transform(train=True):
     transform_train = transforms.Compose([
         transforms.Pad(padding=4, fill=(125,123,113)),
         transforms.RandomCrop(32, padding=0),
@@ -121,18 +119,16 @@ def cifar_transforms(train=True):
     transform = transform_train if train else transform_test
     return transform
 
-def imagenet_transforms(train=True):
+def fashionMnist_transform(train=True):
     transform_train = transforms.Compose([
         transforms.RandomCrop(64, padding=4),
         transforms.Resize(size=(32, 32)),
         transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        transforms.ToTensor()
     ])
     transform_test = transforms.Compose([
         transforms.Resize(size=(32, 32)),
-        transforms.ToTensor(),
-        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        transforms.ToTensor()
     ])
     transform = transform_train if train else transform_test
     return transform
