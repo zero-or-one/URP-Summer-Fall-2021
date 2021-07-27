@@ -15,7 +15,6 @@ def regularization(model, lamb=0.01, l2=True):
         regulr = 0.5 * lamb * sum([np.abs(p.data.norm()) for p in model.parameters()])
     return regular
 
-
 def configure_learning_rate(optimizer, decay=0.1):
     if isinstance(optimizer, torch.optim.SGD):
         for param_group in optimizer.param_groups:
@@ -56,10 +55,10 @@ def set_optimizer(args, parameters):
 
     return optimizer
 
-def set_loss(args):
+def set_loss(loss):
     #if args.loss == 'svm':
     #    loss_fn = MultiClassHingeLoss()
-    if args.loss == 'ce':
+    if loss == 'ce':
         loss_fn = nn.CrossEntropyLoss()
     # add losses
     else:

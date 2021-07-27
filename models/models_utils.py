@@ -1,7 +1,9 @@
 import numpy as np
 import torch
 from torch.nn import functional as F
+from models import *
 
+# add models
 _MODELS = {}
 
 def _add_model(model_fn):
@@ -9,36 +11,41 @@ def _add_model(model_fn):
     return model_fn
 
 @_add_model
-def mlp(**kwargs):
-    return MLP(**kwargs)
+def lr(**kwargs):
+    return LinearRegression(**kwargs)
 
 @_add_model
-def ntk_linear(**kwargs):
-    return NTK_Linear(**kwargs)
+def pl(**kwargs):
+    return PolynomialRegression(**kwargs)
 
 @_add_model
-def ntk_mlp(**kwargs):
-    return NTK_MLP(**kwargs)
+def logr(**kwargs):
+    return LogisticRegression(**kwargs)
 
 @_add_model
-def allcnn(**kwargs):
-    return AllCNN(**kwargs)
+def dnn(**kwargs):
+    return DNN(**kwargs)
 
 @_add_model
-def ntk_allcnn(**kwargs):
-    return ntk_AllCNN(**kwargs)
-
-@_add_model
-def allcnn_no_bn(**kwargs):
-    return AllCNN(batch_norm=False, **kwargs)
+def cnn(**kwargs):
+    return CNN(**kwargs)
 
 @_add_model
 def resnet(**kwargs):
     return ResNet18(**kwargs)
 
+# get the models
+def get_model(name, **kwargs):
+    return _MODELS[name](**kwargs)
+
+'''
 @_add_model
 def resnet_small(**kwargs):
     return ResNet18_small(**kwargs)
+
+@_add_model
+def allcnn_no_bn(**kwargs):
+    return AllCNN(batch_norm=False, **kwargs)
 
 @_add_model
 def wide_resnet(**kwargs):
@@ -51,6 +58,4 @@ def is_wide_resnet(**kwargs):
 @_add_model
 def ntk_wide_resnet(**kwargs):
     return Wide_ResNetNTK(**kwargs)
-
-def get_model(name, **kwargs):
-    return _MODELS[name](**kwargs)
+'''

@@ -42,7 +42,7 @@ class LogisticRegression(torch.nn.Module):
         return outputs
 
 # DNN model
-class DNN(torch.nn.Module):
+class DNN(nn.Module):
 
     def __init__(self, input_size=512, num_classes=10, num_layers=2, activation=nn.ReLU):
         super(DNN, self).__init__()
@@ -69,7 +69,7 @@ class DNN(torch.nn.Module):
             return self.layers(x)
 
 # helper class for passing values
-class Same():
+class Same(nn.Module):
 
     def __init__(self):
         super(Same, self).__init__()
@@ -93,28 +93,28 @@ class ConvUnit(nn.Sequential):
                                          output_padding=output_padding, bias=not batch_norm)]
         if batch_norm:
             model += [nn.BatchNorm2d(out_channels, affine=True)]
-        model += [activation_fn()]
-        super(Conv, self).__init__(*model)
+        model += [nn.ReLU()]
+        super(ConvUnit, self).__init__(*model)
 
 class CNN(nn.Module):
 
     def __init__(self, filters_percentage=1., n_channels=3, num_classes=10, dropout=False, batch_norm=True):
-        super(AllCNN, self).__init__()
+        super(CNN, self).__init__()
         n_filter1 = int(96 * filters_percentage)
         n_filter2 = int(192 * filters_percentage)
         self.features = nn.Sequential(
             ConvUnit(n_channels, n_filter1, kernel_size=3, batch_norm=batch_norm),
             ConvUnit(n_filter1, n_filter1, kernel_size=3, batch_norm=batch_norm),
             ConvUnit(n_filter1, n_filter2, kernel_size=3, stride=2, padding=1, batch_norm=batch_norm),
-            nn.Dropout(inplace=True) if dropout else Identity(),
+            nn.Dropout(inplace=True) if dropout else Same(),
             ConvUnit(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
             ConvUnit(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
             ConvUnit(n_filter2, n_filter2, kernel_size=3, stride=2, padding=1, batch_norm=batch_norm),
-            nn.Dropout(inplace=True) if dropout else Identity(),
+            nn.Dropout(inplace=True) if dropout else Same(),
             ConvUnit(n_filter2, n_filter2, kernel_size=3, stride=1, batch_norm=batch_norm),
             ConvUnit(n_filter2, n_filter2, kernel_size=1, stride=1, batch_norm=batch_norm),
             nn.AvgPool2d(8),
-            Flatten(),
+            nn.Flatten(),
         )
         self.classifier = nn.Sequential(
             nn.Linear(n_filter2, num_classes),
@@ -124,7 +124,7 @@ class CNN(nn.Module):
         features = self.features(x)
         output = self.classifier(features)
         return output
-
+'''
 class ResNet18(nn.Module):
     def __init__(self, filters_percentage=1.0, n_channels = 3, num_classes=10, block=_ResBlock, num_blocks=[2,2,2,2], n_classes=10):
         super(ResNet18, self).__init__()
@@ -156,3 +156,4 @@ class ResNet18(nn.Module):
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         return out
+'''
