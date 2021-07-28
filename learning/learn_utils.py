@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.nn as nn
+import json
 
 
 def class_accuracy(pred_labels, true_labels):
@@ -24,38 +25,44 @@ def configure_learning_rate(optimizer, decay=0.1):
     else:
         raise ValueError
 
-def set_optimizer(args, parameters):
+def set_optimizer(opt, parameters, eta, decay, load_opt, momentum=None):
     """
     - SGD
     - Adam
     - Adagrad
-    - AMSGrad
     """
-    if args.opt == 'sgd':
-        optimizer = torch.optim.SGD(parameters, lr=args.eta, weight_decay=args.l2,
-                                    momentum=args.momentum, nesterov=bool(args.momentum))
-    elif args.opt == "adam":
-        optimizer = torch.optim.Adam(parameters, lr=args.eta, weight_decay=args.l2)
-    elif args.opt == "adagrad":
-        optimizer = torch.optim.Adagrad(parameters, lr=args.eta, weight_decay=args.l2)
-    elif args.opt == "amsgrad":
-        optimizer = torch.optim.Adam(parameters, lr=args.eta, weight_decay=args.l2, amsgrad=True)
+    if opt == 'sgd':
+        optimizer = torch.optim.SGD(parameters, lr=eta, weight_decay=decay,
+                                    momentum=momentum, nesterov=bool(momentum))
+    elif opt == "adam":
+        optimizer = torch.optim.Adam(parameters, lr=eta, weight_decay=decay)
+    elif opt == "adagrad":
+        optimizer = torch.optim.Adagrad(parameters, lr=eta, weight_decay=decay)
+    elif opt == "amsgrad":
+        optimizer = torch.optim.Adam(parameters, lr=eta, weight_decay=decay, amsgrad=True)
     else:
-        raise ValueError(args.opt)
+        raise ValueError(opt)
 
-    print("Optimizer: \t {}".format(args.opt.upper()))
+    print("Optimizer: \t ", opt)
 
     optimizer.gamma = 1
-    optimizer.eta = args.eta
+    optimizer.eta = eta
 
-    if args.load_opt:
-        state = torch.load(args.load_opt)['optimizer']
+    if load_opt:
+        state = torch.load(load_opt)['optimizer']
         optimizer.load_state_dict(state)
-        print('Loaded optimizer from {}'.format(args.load_opt))
+        print('Loaded optimizer from {}'.format(load_opt))
 
     return optimizer
 
-def set_loss(loss):
+def set_scheduler(sch, optimizer, step_size, gamma=0.1, last_epoch=-1):
+    if sch:
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma=0.1, last_epoch=-1)
+    else:
+        scheduler = None
+    return scheduler
+
+def set_loss(loss, cuda=None):
     #if args.loss == 'svm':
     #    loss_fn = MultiClassHingeLoss()
     if loss == 'ce':
@@ -64,14 +71,14 @@ def set_loss(loss):
     else:
         raise ValueError
 
-    print('L2 regularization: \t {}'.format(args.l2))
     print('\nLoss function:')
     print(loss_fn)
 
-    if args.cuda:
+    if cuda is not None:
         loss_fn = loss_fn.cuda()
 
     return loss_fn
+
 
 def batchnorm_mode(model, train=True):
     if isinstance(model, torch.nn.BatchNorm1d) or isinstance(model, torch.nn.BatchNorm2d):
@@ -82,3 +89,10 @@ def batchnorm_mode(model, train=True):
     # optional in my code
     for l in model.children():
         batchnorm_mode(l, train=train)
+
+def save_state(model, optimizer, filename):
+    torch.save({'model': model.state_dict(),
+                'optimizer': optimizer.state_dict()}, filename)
+
+def log_metrics(split, metrics, epoch, **kwargs):
+    print(f'[{epoch}] {split} metrics:' + json.dumps(metrics.avg))

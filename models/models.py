@@ -124,9 +124,36 @@ class CNN(nn.Module):
         features = self.features(x)
         output = self.classifier(features)
         return output
-'''
+
+def ConvRes(in_planes, out_planes, stride=1):
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
+
+class ResBlock(nn.Module):
+    '''Pre-activation version of the BasicBlock.'''
+    expansion = 1
+
+    def __init__(self, in_planes, planes, stride=1):
+        super(_ResBlock, self).__init__()
+        self.bn1 = nn.BatchNorm2d(in_planes)
+        self.conv1 = ConvRes(in_planes, planes, stride=stride)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.conv2 = ConvRes(planes, planes)
+
+        if stride != 1 or in_planes != self.expansion * planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False)
+            )
+
+    def forward(self, x):
+        out = F.relu(self.bn1(x))
+        shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
+        out = self.conv1(out)
+        out = self.conv2(F.relu(self.bn2(out)))
+        out += shortcut
+        return out
+
 class ResNet18(nn.Module):
-    def __init__(self, filters_percentage=1.0, n_channels = 3, num_classes=10, block=_ResBlock, num_blocks=[2,2,2,2], n_classes=10):
+    def __init__(self, filters_percentage=1.0, n_channels = 3, num_classes=10, block=ResBlock, num_blocks=[2,2,2,2]):
         super(ResNet18, self).__init__()
         self.in_planes = 64
 
@@ -156,4 +183,3 @@ class ResNet18(nn.Module):
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         return out
-'''

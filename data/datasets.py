@@ -23,7 +23,7 @@ def create_loaders(dataset_train, dataset_val, dataset_test,
                                                     seed=seed)
     else: # shuffle
         train_size = train_size if train_size is not None else len(dataset_train)
-        train_indices, = random_part(train_size,
+        train_indices, = random_part((train_size,),
                                         len(dataset_train),
                                         seed=seed)
         val_size = val_size if val_size is not None else len(dataset_val)
