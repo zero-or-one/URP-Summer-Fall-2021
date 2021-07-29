@@ -15,15 +15,14 @@ def get_model(name, **kwargs):
         model = LogisticRegression(input_size=kwargs.get("input_size"))
     elif name == "dnn":
         model = DNN(input_size=kwargs.get("input_size"), num_classes=kwargs.get("num_classes"),
-                    num_layers=kwargs.get("num_layers"), activation=kwargs.get("activation"))
+                    hidden_size=kwargs.get("hidden_size"), num_layer=kwargs.get("num_layer"), activation=kwargs.get("activation"))
     elif name == "cnn":
         model = CNN(filters_percentage=kwargs.get("filters_percentage"), n_channels=kwargs.get("n_channels"),
                     num_classes=kwargs.get("num_classes"), dropout=kwargs.get("dropout"), batch_norm=kwargs.get("batch_norm"))
-    elif name == "resnet":
+    elif name == "resnet18":
         model = ResNet18(filters_percentage=kwargs.get("filters_percentage"), n_channels=kwargs.get("n_channels"),
                     num_classes=kwargs.get("num_classes"), block=kwargs.get("block"), num_blocks=kwargs.get("num_blocks"))
     return model
-
 
 def get_param(name):
     if name == "linear_regression":

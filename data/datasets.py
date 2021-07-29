@@ -15,12 +15,13 @@ seed = 1000
 
 def create_loaders(dataset_train, dataset_val, dataset_test,
                    train_size, val_size, test_size, batch_size, test_batch_size,
-                   cuda, num_workers, split=True):
+                   cuda, num_workers, split=False):
     kwargs = {'num_workers': num_workers, 'pin_memory': True} if cuda else {}
     if split:
         train_indices, val_indices = random_part((train_size, val_size),
                                                     len(dataset_train),
                                                     seed=seed)
+        print(train_indices, val_indices)
     else: # shuffle
         train_size = train_size if train_size is not None else len(dataset_train)
         train_indices, = random_part((train_size,),
@@ -45,7 +46,7 @@ def create_loaders(dataset_train, dataset_val, dataset_test,
                                    batch_size=batch_size,
                                    shuffle=True, **kwargs)
     val = data.DataLoader(dataset_val,
-                                 batch_size=test_batch_size,
+                                 batch_size=batch_size,
                                  shuffle=False, **kwargs)
     test = data.DataLoader(dataset_test,
                                   batch_size=test_batch_size,

@@ -2,9 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import init
-from torch.nn.parameter import Parameter
-from torch.autograd import Variable
 
 
 # linear regression model
@@ -41,32 +38,55 @@ class LogisticRegression(torch.nn.Module):
         outputs = F.sigmoid(outputs)
         return outputs
 
-# DNN model
+
+class Layer(nn.Linear):
+
+    def __init__(self, in_features, out_features, bias=5, beta=np.sqrt(0.1), w_sig=np.sqrt(2.0)):
+        self.beta = beta
+        self.w_sig = w_sig
+        super(Layer, self).__init__(in_features, out_features)
+        self.reset_parameters()
+        #self.bias = bias
+
+    def reset_parameters(self):
+        torch.nn.init.normal_(self.weight, mean=0, std=self.w_sig / np.sqrt(self.in_features))
+        if self.bias is not None:
+            torch.nn.init.normal_(self.bias, mean=0, std=self.beta)
+
+    def forward(self, input):
+        return F.linear(input, self.weight, self.bias)
+
+    def extra_repr(self):
+        return 'in_features={}, out_features={}, bias={}, beta={}'.format(
+            self.in_features, self.out_features, self.bias is not None, self.beta)
+
+# n
 class DNN(nn.Module):
 
-    def __init__(self, input_size=512, num_classes=10, num_layers=2, activation=nn.ReLU):
+    def __init__(self, input_size=512, num_classes=10, hidden_size=16, num_layer=2, activation=nn.ReLU()):
         super(DNN, self).__init__()
         self.input_size = input_size
-        self.num_layers = num_layers
+        self.num_layer = num_layer
         self.num_classes = num_classes
-        self.layers = _add_layers()
+        self.hidden_size = hidden_size
+        self.activation = activation
+        self.layers = self._make_layers()
 
-        def _add_layers(self):
-            layer = []
-            layer += [nn.Layer(self.input_size,self.hidden_size)]
-            layer += [activation]
-            hidden_size = int(self.input_size / 4)
-            for i in  range(self.num_layers - 2):
-                layer+= [nn.Linear(hidden_size, hidden_size)]
-                layer += [activation]
-                if hidden_size > 32:
-                    hidden_size /= 4
-            layer += [nn.Linear(hidden_size, num_classes)]
-            return nn.Sequential(*layer)
+    def _make_layers(self):
+        layer = []
+        layer += [
+        Layer(self.input_size, self.hidden_size),
+        self.activation]
+        #layer += [self.activation]
+        for i in range(self.num_layer - 2):
+            layer += [Layer(self.hidden_size, self.hidden_size)]
+            layer += [self.activation]
+        layer += [Layer(self.hidden_size, self.num_classes)]
+        return nn.Sequential(*layer)
 
-        def forward(self, x):
-            x = x.reshape(x.size(0), self.input_size)
-            return self.layers(x)
+    def forward(self, x):
+        x = x.reshape(x.size(0), self.input_size)
+        return self.layers(x)
 
 # helper class for passing values
 class Same(nn.Module):
@@ -133,7 +153,7 @@ class ResBlock(nn.Module):
     expansion = 1
 
     def __init__(self, in_planes, planes, stride=1):
-        super(_ResBlock, self).__init__()
+        super(ResBlock, self).__init__()
         self.bn1 = nn.BatchNorm2d(in_planes)
         self.conv1 = ConvRes(in_planes, planes, stride=stride)
         self.bn2 = nn.BatchNorm2d(planes)
@@ -157,7 +177,7 @@ class ResNet18(nn.Module):
         super(ResNet18, self).__init__()
         self.in_planes = 64
 
-        self.conv1 = conv3x3(n_channels,64)
+        self.conv1 = ConvRes(n_channels, 64)
         self.bn1 = nn.BatchNorm2d(64)
         self.layer1 = self._make_layer(block, int(64*filters_percentage), num_blocks[0], stride=1)
         self.layer2 = self._make_layer(block, int(128*filters_percentage), num_blocks[1], stride=2)

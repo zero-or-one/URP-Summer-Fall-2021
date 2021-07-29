@@ -41,7 +41,9 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, disable_bn, trai
     #log_metrics(mode, metrics, epoch)
     #logger.append('train' if mode=='train' else 'test', epoch=epoch_num, loss=metrics.avg['loss'], error=metrics.avg['error'],
     #              lr=optimizer.param_groups[0]['lr'])
-    print('Learning Rate : {}'.format(optimizer.param_groups[0]['lr']))
+    if epoch_num % 5:
+
+        print('Learning Rate : {}'.format(optimizer.param_groups[0]['lr']))
     #return metrics
 
 def train(name, loss, optimizer, scheduler, epochs, device, dataset, model, lossfn, disable_bn, train_loader,
