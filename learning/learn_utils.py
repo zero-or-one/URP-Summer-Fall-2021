@@ -25,7 +25,24 @@ def configure_learning_rate(optimizer, decay=0.1):
     else:
         raise ValueError
 
-def set_optimizer(opt, parameters, eta, decay, load_opt, momentum=None):
+def set_loss(loss, cuda=None):
+    #if args.loss == 'svm':
+    #    loss_fn = MultiClassHingeLoss()
+    if loss == 'ce':
+        loss_fn = nn.CrossEntropyLoss()
+    # add losses
+    else:
+        raise ValueError
+
+    print('\nLoss function:')
+    print(loss_fn)
+
+    if cuda is not None:
+        loss_fn = loss_fn.cuda()
+
+    return loss_fn
+
+def set_optimizer(opt, parameters, eta, decay, momentum=None, load_opt=False):
     """
     - SGD
     - Adam
@@ -61,24 +78,6 @@ def set_scheduler(sch, optimizer, step_size, gamma=0.1, last_epoch=-1):
     else:
         scheduler = None
     return scheduler
-
-def set_loss(loss, cuda=None):
-    #if args.loss == 'svm':
-    #    loss_fn = MultiClassHingeLoss()
-    if loss == 'ce':
-        loss_fn = nn.CrossEntropyLoss()
-    # add losses
-    else:
-        raise ValueError
-
-    print('\nLoss function:')
-    print(loss_fn)
-
-    if cuda is not None:
-        loss_fn = loss_fn.cuda()
-
-    return loss_fn
-
 
 def batchnorm_mode(model, train=True):
     if isinstance(model, torch.nn.BatchNorm1d) or isinstance(model, torch.nn.BatchNorm2d):
