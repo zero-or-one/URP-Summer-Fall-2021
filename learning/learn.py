@@ -10,7 +10,7 @@ import time
 sys.path.append("../URP")
 from utils import *
 
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 def epoch(criterion, optimizer, device, dataset, model, lossfn, disable_bn, train_loader, scheduler=None, weight_decay=0.0, epoch_num=10, train=True):
     if train:
@@ -46,7 +46,7 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, disable_bn, trai
 
 def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, disable_bn, train_loader,
     weight_decay=0.0, lr=0.001, momentum=0.9):
-
+    model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
     criterion = set_loss(loss)
     scheduler = set_scheduler(scheduler, optimizer, step_size=3, gamma=0.1, last_epoch=-1)
@@ -57,7 +57,7 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, di
         epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
               disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True)
 
-        if epoch % 5 == 0:
+        if ep % 5 == 0:
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
               disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch=ep, train=True)
         #if epoch % 1 == 0:
