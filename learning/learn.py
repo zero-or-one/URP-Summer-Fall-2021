@@ -7,14 +7,12 @@ import os
 import sys
 import inspect
 import time
-
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(currentdir)
-sys.path.insert(0, parentdir)
+sys.path.append("../URP")
 from utils import *
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def epoch(criterion, optimizer, device, dataset, model, lossfn, disable_bn, train_loader, scheduler=None, weight_decay=0.0, epoch_num, train=True):
+
+
+def epoch(criterion, optimizer, device, dataset, model, lossfn, disable_bn, train_loader, scheduler=None, weight_decay=0.0, epoch_num=10, train=True):
     if train:
         model.train()
     else:
@@ -46,10 +44,10 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, disable_bn, trai
         print('Learning Rate : {}'.format(optimizer.param_groups[0]['lr']))
     #return metrics
 
-def train(name, loss, optimizer, scheduler, epochs, device, dataset, model, lossfn, disable_bn, train_loader,
-    weight_decay=0.0):
-
-    optimizer = set_optimizer(optimizer)
+def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, disable_bn, train_loader,
+    weight_decay=0.0, lr=0.001, momentum=0.9):
+    model.to(device)
+    optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
     criterion = set_loss(loss)
     scheduler = set_scheduler(scheduler, optimizer, step_size=3, gamma=0.1, last_epoch=-1)
 
@@ -57,18 +55,18 @@ def train(name, loss, optimizer, scheduler, epochs, device, dataset, model, loss
 
         t = time.time()
         epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
-              disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch=ep, train=True)
+              disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True)
 
-        if epoch % 5 == 0:
+        if ep % 5 == 0:
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
               disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch=ep, train=True)
         #if epoch % 1 == 0:
         print(f'Epoch Time: {np.round(time.time()-t,2)} sec')
-    torch.save(model.state_dict(), f"checkpoints/{name}_{ep}.pt")
+    torch.save(model.state_dict(), f"checkpoints/{model.__class__.__name__}_{ep}.pt")
 
-def test(criterion, device, dataset, model, lossfn, disable_bn, train_loader, scheduler=None, weight_decay=0.0 train=True):
+def test(criterion, device, dataset, model, lossfn, disable_bn, train_loader, scheduler=None, weight_decay=0.0, train=True):
 
     #model.load_state_dict(torch.load(PATH))
     print("TESTING")
     epoch(criterion=criterion, optimizer=None, device=device, dataset=dataset, model=model, lossfn=lossfn,
-              disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch=ep, train=True)
+              disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=0, train=True)
