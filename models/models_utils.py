@@ -13,8 +13,8 @@ def get_model(name, **kwargs):
         model = PolynomialRegression(degree=kwargs.get("degree"))
     elif name == "logistic_regression":
         model = LogisticRegression(input_size=kwargs.get("input_size"))
-    elif name == "dnn":
-        model = DNN(input_size=kwargs.get("input_size"), num_classes=kwargs.get("num_classes"),
+    elif name == "mlp":
+        model = MLP(input_size=kwargs.get("input_size"), num_classes=kwargs.get("num_classes"),
                     hidden_size=kwargs.get("hidden_size"), num_layer=kwargs.get("num_layer"), activation=kwargs.get("activation"))
     elif name == "cnn":
         model = CNN(filters_percentage=kwargs.get("filters_percentage"), n_channels=kwargs.get("n_channels"),

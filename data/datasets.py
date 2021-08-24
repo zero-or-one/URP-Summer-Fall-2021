@@ -8,10 +8,15 @@ from data_utils import *
 import torch.utils.data as data
 import torchvision.datasets as datasets
 from random import uniform, gauss
-
 root = os.path.expanduser('~/data')
 
 seed = 1000
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
+from torch.utils.data import random_split
+from pandas import read_csv
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score
 
 def create_loaders(dataset_train, dataset_val, dataset_test,
                    train_size, val_size, test_size, batch_size, test_batch_size,
@@ -56,9 +61,19 @@ def create_loaders(dataset_train, dataset_val, dataset_test,
     test.tag = 'test'
     return train, val, test
 
+def prepare_csv(path, batch_size):
+    # load the dataset
+    dataset = CSVDataset(path)
+    # calculate split
+    train, test = dataset.get_splits()
+    # prepare data loaders
+    train_dl = DataLoader(train, batch_size=32, shuffle=True)
+    test_dl = DataLoader(test, batch_size=1024, shuffle=False)
+    return train_dl, test_dl
+
 def get_dataset(dataset, batch_size=16, cuda=0,
                   train_size=50, val_size=10, test_size=10,
-                  test_batch_size=10, **kwargs):
+                  test_batch_size=10, path='./csv_datasets/winequality-red.csv', **kwargs):
 
     if dataset == 'mnist':
         loader_train, loader_val, loader_test = mnist(dataset=dataset, batch_size=batch_size, cuda=cuda,
@@ -76,6 +91,9 @@ def get_dataset(dataset, batch_size=16, cuda=0,
         loader_train, loader_val, loader_test = fashion_mnist(dataset=dataset, batch_size=batch_size, cuda=cuda,
                   train_size=train_size, val_size=val_size, test_size=test_size,
                   test_batch_size=test_batch_size, **kwargs)
+    elif dataset == 'csv':
+        loader_train, loader_test = prepare_csv(path=path, batch_size=batch_size)
+        loader_val = None
     else:
         raise NotImplementedError
 
@@ -126,6 +144,39 @@ def fashion_mnist(dataset, batch_size=64, cuda=0,
     return create_loaders(dataset_train, dataset_val,
                           dataset_test, train_size, val_size, test_size,
                           batch_size, test_batch_size, cuda, num_workers=4)
+
+class CSVDataset(Dataset):
+    # load the dataset
+    def __init__(self, path):
+        # load the csv file as a dataframe
+        df = read_csv(path, header=None)
+        df = df.iloc[1: , :]
+        # store the inputs and outputs
+        self.X = df.values[:, :-1]
+        self.y = df.values[:, -1]
+        # ensure input data is floats
+        self.X = self.X.astype('float')
+        # label encode target and ensure the values are floats
+        self.y = LabelEncoder().fit_transform(self.y)
+        self.y = self.y.astype('float')
+        self.y = self.y.reshape((len(self.y), 1))
+
+    # number of rows in the dataset
+    def __len__(self):
+        return len(self.X)
+
+    # get a row at an index
+    def __getitem__(self, idx):
+        return [self.X[idx], self.y[idx]]
+
+    # get indexes for train and test rows
+    def get_splits(self, n_test=0.33):
+        # determine sizes
+        test_size = round(n_test * len(self.X))
+        train_size = len(self.X) - test_size
+        # calculate the split
+        return random_split(self, [train_size, test_size])
+
 
 # Data points
 

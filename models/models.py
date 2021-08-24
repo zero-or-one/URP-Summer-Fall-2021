@@ -61,10 +61,10 @@ class Layer(nn.Linear):
             self.in_features, self.out_features, self.bias is not None, self.beta)
 
 # n
-class DNN(nn.Module):
+class MLP(nn.Module):
 
     def __init__(self, input_size=512, num_classes=10, hidden_size=16, num_layer=2, activation=nn.ReLU()):
-        super(DNN, self).__init__()
+        super(MLP, self).__init__()
         self.input_size = input_size
         self.num_layer = num_layer
         self.num_classes = num_classes

@@ -11,17 +11,14 @@ sys.path.append("../URP")
 from utils import *
 
 
-
-def epoch(criterion, optimizer, device, dataset, model, lossfn, disable_bn, train_loader, scheduler=None, weight_decay=0.0, epoch_num=10, train=True):
+def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, scheduler=None, weight_decay=0.0, epoch_num=10, train=True, ):
     if train:
         model.train()
     else:
         model.eval()
 
-    if disable_bn:
-        batchnorm_mode(model, train=False)
-
     mult=0.5 if lossfn=='mse' else 1
+    metrics = AverageMeter()
 
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
@@ -29,44 +26,79 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, disable_bn, trai
         if 'mnist' in dataset:
             data=data.view(data.shape[0],-1)
 
-        output = model(data)
-        loss = mult*criterion(output, target) + regularization(model, weight_decay, l2=True)
         if train:
             optimizer.zero_grad()
+            output = model(data)
+            loss = mult * criterion(output, target) + regularization(model, weight_decay, l2=True)
             loss.backward()
             optimizer.step()
+        else:
+            output = model(data)
+            loss = mult * criterion(output, target) + regularization(model, weight_decay, l2=True)
 
-    #log_metrics(mode, metrics, epoch)
-    #logger.append('train' if mode=='train' else 'test', epoch=epoch_num, loss=metrics.avg['loss'], error=metrics.avg['error'],
-    #              lr=optimizer.param_groups[0]['lr'])
-    if epoch_num % 5:
+    metrics.update(n=data.size(0), loss=loss.item(), error=get_error(output, target))
 
-        print('Learning Rate : {}'.format(optimizer.param_groups[0]['lr']))
-    #return metrics
+    log_metrics('train' if train else 'test', metrics, epoch)
+    logger.append('train' if train else 'test', epoch=epoch_num, loss=metrics.avg['loss'], error=metrics.avg['error'],
+                  lr=optimizer.param_groups[0]['lr'])
+    #print('Learning Rate : {}'.format(optimizer.param_groups[0]['lr']))
 
-def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, disable_bn, train_loader,
+    return metrics
+
+
+def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, disable_bn, train_loader, val_loader,
     weight_decay=0.0, lr=0.001, momentum=0.9):
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
     criterion = set_loss(loss)
     scheduler = set_scheduler(scheduler, optimizer, step_size=3, gamma=0.1, last_epoch=-1)
 
-    for ep in range(epochs):
+    mkdir('logs')
 
+    logger = Logger(index=str(model.__class__.__name__)+'_training')
+    #logger['args'] = args
+    logger['checkpoint'] = os.path.join('models/', logger.index+'.pth')
+    logger['checkpoint_step'] = os.path.join('models/', logger.index+'_{}.pth')
+    print("[Logging in {}]".format(logger.index))
+
+    for ep in range(epochs):
         t = time.time()
         epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
-              disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True)
-
+               train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True, logger=logger)
         if ep % 5 == 0:
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
-              disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch=ep, train=True)
-        #if epoch % 1 == 0:
-        print(f'Epoch Time: {np.round(time.time()-t,2)} sec')
-    torch.save(model.state_dict(), f"checkpoints/{model.__class__.__name__}_{ep}.pt")
+                  train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
+                  logger=logger)
+        print(f'Epoch number: {epoch} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
+    filename = f"checkpoints/{model.__class__.__name__}_{epochs}.pt"
+    save_state(model, optimizer, filename)
+    print("FINISH TRAINING")
 
-def test(criterion, device, dataset, model, lossfn, disable_bn, train_loader, scheduler=None, weight_decay=0.0, train=True):
+'''
+def test(criterion, device, dataset, model, lossfn, disable_bn, train_loader, path, scheduler=None):
 
-    #model.load_state_dict(torch.load(PATH))
+    model.load_state_dict(torch.load(path))
     print("TESTING")
     epoch(criterion=criterion, optimizer=None, device=device, dataset=dataset, model=model, lossfn=lossfn,
-              disable_bn=disable_bn, train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=0, train=True)
+            train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=0, train=True, logger=logger)
+    print("FINISH TESTING")
+    
+def evaluate_model(test_dl, model):
+    predictions, actuals = list(), list()
+    for i, (inputs, targets) in enumerate(test_dl):
+        # evaluate the model on the test set
+        yhat = model(inputs)
+        # retrieve numpy array
+        yhat = yhat.detach().numpy()
+        actual = targets.numpy()
+        actual = actual.reshape((len(actual), 1))
+        # round to class values
+        yhat = yhat.round()
+        # store
+        predictions.append(yhat)
+        actuals.append(actual)
+    predictions, actuals = vstack(predictions), vstack(actuals)
+    # calculate accuracy
+    acc = accuracy_score(actuals, predictions)
+    return acc
+'''
