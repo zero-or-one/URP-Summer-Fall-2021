@@ -61,7 +61,7 @@ def create_loaders(dataset_train, dataset_val, dataset_test,
     test.tag = 'test'
     return train, val, test
 
-def prepare_csv(path, batch_size):
+def prepare_csv(path='./csv_datasets/winequality-red.csv', batch_size=16):
     # load the dataset
     dataset = CSVDataset(path)
     # calculate split
@@ -218,3 +218,14 @@ def half_doughnuts(lim1, lim2):
             y_2.append(y)
             N_2 += 1
     return (x_1, y_1), (x_2, y_2)
+
+def linear_points(shape): # Y = X*w
+    row, col = shape
+    w = np.random.randn(col+1, 1)
+    X = 20 + 10*np.random.randn(row, col)
+    b = np.ones((row, 1))
+    X = np.hstack((X, b))
+    Y = np.matmul(X, w)
+    for i in range(len(Y)):  # add some noise
+        Y[i] += 1 + 5 * np.random.normal()
+    return X, Y

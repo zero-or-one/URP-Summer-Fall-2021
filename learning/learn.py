@@ -11,7 +11,7 @@ sys.path.append("../URP")
 from utils import *
 
 
-def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, scheduler=None, weight_decay=0.0, epoch_num=10, train=True, ):
+def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, scheduler=None, weight_decay=0.0, epoch_num=10, train=True):
     if train:
         model.train()
     else:
@@ -69,36 +69,20 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, di
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
-        print(f'Epoch number: {epoch} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
-    filename = f"checkpoints/{model.__class__.__name__}_{epochs}.pt"
+        print(f'Epoch number: {ep} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
+    filename = f"checkpoints/{model.__class__.__name__}_{ep}.pt"
     save_state(model, optimizer, filename)
-    print("FINISH TRAINING")
+    print("FINISHED TRAINING")
 
-'''
-def test(criterion, device, dataset, model, lossfn, disable_bn, train_loader, path, scheduler=None):
 
-    model.load_state_dict(torch.load(path))
+def test(model, loss, device, dataset, lossfn, disable_bn, test_loader):
+    
+    model.to(device)
+    optimizer = set_optimizer(optimizer, model.parameters(), 0.001, 0.001, 0.8)
+    model.load_state_dict(checkpoints['model'])
+    optimizer.load_state_dict(checkpoints['optimizer'])
+    criterion = set_loss(loss)
     print("TESTING")
     epoch(criterion=criterion, optimizer=None, device=device, dataset=dataset, model=model, lossfn=lossfn,
-            train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=0, train=True, logger=logger)
-    print("FINISH TESTING")
-    
-def evaluate_model(test_dl, model):
-    predictions, actuals = list(), list()
-    for i, (inputs, targets) in enumerate(test_dl):
-        # evaluate the model on the test set
-        yhat = model(inputs)
-        # retrieve numpy array
-        yhat = yhat.detach().numpy()
-        actual = targets.numpy()
-        actual = actual.reshape((len(actual), 1))
-        # round to class values
-        yhat = yhat.round()
-        # store
-        predictions.append(yhat)
-        actuals.append(actual)
-    predictions, actuals = vstack(predictions), vstack(actuals)
-    # calculate accuracy
-    acc = accuracy_score(actuals, predictions)
-    return acc
-'''
+            train_loader=test_loader, scheduler=None, weight_decay=0.0, epoch_num=0, train=False, logger=logger)
+    print("FINISHED TESTING")
