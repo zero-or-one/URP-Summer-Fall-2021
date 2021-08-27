@@ -1,7 +1,4 @@
 
-import torch
-
-import utils
 from learn_utils import *
 import os
 import sys
@@ -38,7 +35,7 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
 
     metrics.update(n=data.size(0), loss=loss.item(), error=get_error(output, target))
 
-    log_metrics('train' if train else 'test', metrics, epoch)
+    log_metrics('train' if train else 'test', metrics, epoch_num)
     logger.append('train' if train else 'test', epoch=epoch_num, loss=metrics.avg['loss'], error=metrics.avg['error'],
                   lr=optimizer.param_groups[0]['lr'])
     #print('Learning Rate : {}'.format(optimizer.param_groups[0]['lr']))
@@ -70,19 +67,21 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, di
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
         print(f'Epoch number: {ep} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
-    filename = f"checkpoints/{model.__class__.__name__}_{ep}.pt"
+    filename = f"checkpoint/{model.__class__.__name__}_{ep}.pt"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
 
 
-def test(model, loss, device, dataset, lossfn, disable_bn, test_loader):
+def test(model, loss, optimizer, device, dataset, lossfn, disable_bn, test_loader, at_epoch):
     
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), 0.001, 0.001, 0.8)
-    model.load_state_dict(checkpoints['model'])
-    optimizer.load_state_dict(checkpoints['optimizer'])
+    checkpoint = torch.load(f"checkpoint/{model.__class__.__name__}_{at_epoch}.pt")
+    model.load_state_dict(checkpoint['model'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
     criterion = set_loss(loss)
+    logger = Logger(index=str(model.__class__.__name__) + '_testing')
     print("TESTING")
-    epoch(criterion=criterion, optimizer=None, device=device, dataset=dataset, model=model, lossfn=lossfn,
+    epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
             train_loader=test_loader, scheduler=None, weight_decay=0.0, epoch_num=0, train=False, logger=logger)
     print("FINISHED TESTING")
