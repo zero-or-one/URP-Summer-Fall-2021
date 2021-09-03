@@ -96,7 +96,7 @@ def batchnorm_mode(model, train=True):
 
 def save_state(model, optimizer, filename):
     torch.save({'model': model.state_dict(),
-                'optimizer': optimizer.state_dict()}, filename)
+                'optimizer': optimizer.state_dict()}, os.path.join(filename))
 
 def get_error(output, target):
     if output.shape[1]>1:
@@ -131,10 +131,6 @@ def log_metrics(split, metrics, epoch, **kwargs):
     print(f'[{epoch}] {split} metrics:' + json.dumps(metrics.avg))
 
 def mkdir(directory):
-    '''Make directory and all parents, if needed.
-    Does not raise and error if directory already exists.
-    '''
-
     try:
         os.makedirs(directory)
     except OSError as e:
@@ -167,7 +163,6 @@ class Logger(object):
             raise ValueError("{} is not a valid filename".format(filename))
         with open(filename, 'rb') as f:
             return pickle.load(f)
-
 
     def save(self):
         with open(self.filename,'wb') as f:

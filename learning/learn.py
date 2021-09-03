@@ -51,6 +51,7 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, di
     scheduler = set_scheduler(scheduler, optimizer, step_size=3, gamma=0.1, last_epoch=-1)
 
     mkdir('logs')
+    mkdir('checkpoints')
 
     logger = Logger(index=str(model.__class__.__name__)+'_training')
     #logger['args'] = args
@@ -67,7 +68,7 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, di
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
         print(f'Epoch number: {ep} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
-    filename = f"checkpoint/{model.__class__.__name__}_{ep}.pt"
+    filename = f"./checkpoints/{model.__class__.__name__}_{ep}.pth.tar"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
 
