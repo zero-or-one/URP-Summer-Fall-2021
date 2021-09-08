@@ -43,7 +43,7 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
     return metrics
 
 
-def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, disable_bn, train_loader, val_loader,
+def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, train_loader, val_loader,
     weight_decay=0.0, lr=0.001, momentum=0.9):
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
@@ -63,7 +63,7 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, di
         t = time.time()
         epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
                train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True, logger=logger)
-        if ep % 5 == 0:
+        if (ep % 5 == 0 and (val_loader is not None)):
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
@@ -73,11 +73,11 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, di
     print("FINISHED TRAINING")
 
 
-def test(model, loss, optimizer, device, dataset, lossfn, disable_bn, test_loader, at_epoch):
+def test(model, loss, optimizer, device, dataset, lossfn, test_loader, at_epoch):
     
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), 0.001, 0.001, 0.8)
-    checkpoint = torch.load(f"checkpoint/{model.__class__.__name__}_{at_epoch}.pt")
+    checkpoint = torch.load(f"checkpoints/{model.__class__.__name__}_{at_epoch}.pth.tar")
     model.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])
     criterion = set_loss(loss)

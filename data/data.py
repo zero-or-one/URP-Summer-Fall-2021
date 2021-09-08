@@ -67,8 +67,8 @@ def prepare_csv(path='./csv_datasets/winequality-red.csv', batch_size=16):
     # calculate split
     train, test = dataset.get_splits()
     # prepare data loaders
-    train_dl = DataLoader(train, batch_size=32, shuffle=True)
-    test_dl = DataLoader(test, batch_size=1024, shuffle=False)
+    train_dl = DataLoader(train, batch_size=batch_size, shuffle=True)
+    test_dl = DataLoader(test, batch_size=batch_size, shuffle=False)
     return train_dl, test_dl
 
 def get_dataset(dataset, batch_size=16, cuda=0,
