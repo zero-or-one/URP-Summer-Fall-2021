@@ -68,7 +68,7 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, tr
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
         print(f'Epoch number: {ep} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
-    filename = f"./checkpoints/{model.__class__.__name__}_{ep}.pth.tar"
+    filename = f"./checkpoints/{model.__class__.__name__}_{ep+1}.pth.tar"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
 
