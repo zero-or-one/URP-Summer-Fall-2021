@@ -8,7 +8,7 @@ sys.path.append("../URP")
 from utils import *
 
 
-def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, scheduler=None, weight_decay=0.0, epoch_num=10, train=True):
+def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, weight_decay=0.0, epoch_num=10, train=True):
     if train:
         model.train()
     else:
