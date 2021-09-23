@@ -44,7 +44,7 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
 
 
 def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, scheduler=None,
-    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True):
+    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=1):
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
     criterion = set_loss(loss)
@@ -53,7 +53,7 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
     mkdir('logs')
     mkdir('checkpoints')
 
-    early_stop_callback = EarlyStopping()
+    early_stop_callback = EarlyStopping(patience=patience, min_delta=min_delta)
     logger = Logger(index=str(model.__class__.__name__)+'_training')
     #logger['args'] = args
     logger['checkpoint'] = os.path.join('models/', logger.index+'.pth')
