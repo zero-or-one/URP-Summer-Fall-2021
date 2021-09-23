@@ -70,6 +70,7 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
             loss_val = logger.get('test')[-1]["loss"]
+            print(loss_val)
             early_stop_callback(loss_val)
         print(f'Epoch number: {ep} \nEpoch Time: {np.round(time.time()-t,2)} sec')
         if early_stop_callback.early_stop:
