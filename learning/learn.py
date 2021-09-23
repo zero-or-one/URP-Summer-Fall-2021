@@ -44,7 +44,7 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
 
 
 def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, scheduler=None,
-    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=1):
+    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=0):
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
     criterion = set_loss(loss)
@@ -70,7 +70,7 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
             loss_val = logger.get('test')[-1]["loss"]
-            print(loss_val)
+            #print(loss_val)
             early_stop_callback(loss_val)
         print(f'Epoch number: {ep} \nEpoch Time: {np.round(time.time()-t,2)} sec')
         if early_stop_callback.early_stop:
