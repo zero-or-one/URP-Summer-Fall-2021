@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 import torch.utils.data as data
 from matplotlib import pyplot as plt
 
+
 # get subset by indices
 # it exists by default, redefined for comfort
 class Subset(data.Dataset):
@@ -133,4 +134,41 @@ def fashionMnist_transform(train=True):
     transform = transform_train if train else transform_test
     return transform
 
+class AddNoise():
 
+    def __init__(self, mean=0., std=1., **kwargs):
+        self.std = std
+        self.mean = mean
+        super().__init__(**kwargs)
+
+    def encodes(self, x):
+        return x + torch.randn(x.size()) * self.std + self.mean
+
+    def generate(self, size=[1, 32, 32]):
+        return torch.randn(size) * self.std + self.mean
+'''
+def separate_data(ds, given=False, idxs=[], target=0, cuda=0):
+    labels_all = []
+    idxs_all = []
+    for imgs, labels in ds:
+        if not given:
+            idxs = np.concatenate((idxs, dummy), axis=None)
+            dummy = (labels == target).nonzero().numpy()
+            idxs = np.concatenate((idxs, dummy), axis=None)
+            print(idxs)
+        labels_all = np.concatenate((labels_all, labels), axis=None)
+        print(labels_all)
+    batch_size = ds.batch_size
+    kwargs = {'num_workers': ds.num_workers, 'pin_memory': True} if cuda else {}
+    forget = Subset(ds, idxs)
+    idxs_ret = np.copy(idxs)
+    for idx in idxs:
+        idxs_ret = idxs_ret[idxs_ret != id]
+    #idxs_ret = np.setdiff1d(labels_all, idxs)
+    retain = Subset(ds, idxs_ret)
+    forget = data.DataLoader(forget, batch_size=batch_size,
+                                   shuffle=True, **kwargs)
+    retain = data.DataLoader(retain, batch_size=batch_size,
+                                   shuffle=True, **kwargs)
+    return forget, retain
+'''

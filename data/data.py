@@ -10,13 +10,15 @@ import torchvision.datasets as datasets
 from random import uniform, gauss
 root = os.path.expanduser('~/data')
 
-seed = 1000
+seed = 42
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
+from torchvision import transforms
+
 from pandas import read_csv
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
+
 
 def create_loaders(dataset_train, dataset_val, dataset_test,
                    train_size, val_size, test_size, batch_size, test_batch_size,
@@ -229,3 +231,4 @@ def linear_points(shape): # Y = X*w
     for i in range(len(Y)):  # add some noise
         Y[i] += 1 + 5 * np.random.normal()
     return X, Y
+

@@ -1,4 +1,4 @@
-# it is not usable with jupyter notebook
+# it is harder to use parsers for me
 # so not worth to utilize
 '''
 import os

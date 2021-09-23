@@ -8,7 +8,7 @@ sys.path.append("../URP")
 from utils import *
 
 
-def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, weight_decay=0.0, epoch_num=10, train=True):
+def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, scheduler=None, weight_decay=0.0, epoch_num=10, train=True):
     if train:
         model.train()
     else:
@@ -43,8 +43,8 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
     return metrics
 
 
-def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, train_loader, val_loader,
-    weight_decay=0.0, lr=0.001, momentum=0.9):
+def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, scheduler=None,
+    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True):
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
     criterion = set_loss(loss)
@@ -53,6 +53,7 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, tr
     mkdir('logs')
     mkdir('checkpoints')
 
+    early_stop_callback = EarlyStopping()
     logger = Logger(index=str(model.__class__.__name__)+'_training')
     #logger['args'] = args
     logger['checkpoint'] = os.path.join('models/', logger.index+'.pth')
@@ -61,16 +62,23 @@ def train(model, loss, optimizer, scheduler, epochs, device, dataset, lossfn, tr
 
     for ep in range(epochs):
         t = time.time()
+        #configure_learning_rate(optimizer, epoch)
         epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
                train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True, logger=logger)
-        if (ep % 5 == 0 and (val_loader is not None)):
+        if (val_loader is not None):
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
-        print(f'Epoch number: {ep} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
+            early_stop_callback(logger.get('test')[-1]["loss"])
+        print(f'Epoch number: {ep} \nEpoch Time: {np.round(time.time()-t,2)} sec')
+        if early_stop_callback.early_stop:
+            print("EARLY STOPPING")
+            break
     filename = f"./checkpoints/{model.__class__.__name__}_{ep+1}.pth.tar"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
+    if curves:
+        plot_curves(logger, bool(val_loader))
 
 
 def test(model, loss, optimizer, device, dataset, lossfn, test_loader, at_epoch):
