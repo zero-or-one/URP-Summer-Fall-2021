@@ -229,6 +229,7 @@ class EarlyStopping():
         self.early_stop = False
 
     def __call__(self, val_loss):
+        print("validation loss ", val_loss)
         if self.best_loss == None:
             self.best_loss = val_loss
         elif self.best_loss - val_loss > self.min_delta:
