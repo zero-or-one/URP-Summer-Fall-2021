@@ -69,7 +69,8 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
-            early_stop_callback(logger.get('test')[0]["loss"])
+            loss_val = logger.get('test')[-1]["loss"]
+            early_stop_callback(loss_val)
         print(f'Epoch number: {ep} \nEpoch Time: {np.round(time.time()-t,2)} sec')
         if early_stop_callback.early_stop:
             print("EARLY STOPPING")
