@@ -193,12 +193,12 @@ def generate_gauss(meanx, meany, stdx, stdy, N):
 
     return x,y
 
-def clusters():
+def dummy_clusters():
     x1, y1 = generate_gauss(1, 2, 1, 1, 1000)
     x2, y2 = generate_gauss(0, 0, 1, 1, 1000)
     return (x1, y1), (x2, y2)
 
-def half_doughnuts(lim1, lim2):
+def dummy_half_doughnuts(lim1, lim2):
     N_1 = 0
     N_2 = 0
     x_1 = []
@@ -221,7 +221,7 @@ def half_doughnuts(lim1, lim2):
             N_2 += 1
     return (x_1, y_1), (x_2, y_2)
 
-def linear_points(shape): # Y = X*w
+def dummy_linear_points(shape): # Y = X*w
     row, col = shape
     w = np.random.randn(col+1, 1)
     X = 20 + 10*np.random.randn(row, col)

@@ -78,8 +78,9 @@ def show_random(dataset, num):
 
 # Transforms
 def general_transforms(train=True):
+    #img_size = (64, 64) if resnet else (32, 32)
     transform_train = transforms.Compose([
-        transforms.Resize(size=(32, 32)),
+        transforms.Resize(size=(32,32)),
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
@@ -123,12 +124,12 @@ def cifar_transform(train=True):
 def fashionMnist_transform(train=True):
     transform_train = transforms.Compose([
         transforms.RandomCrop(64, padding=4),
-        transforms.Resize(size=(32, 32)),
+        transforms.Resize(size=(64, 64)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor()
     ])
     transform_test = transforms.Compose([
-        transforms.Resize(size=(32, 32)),
+        transforms.Resize(size=(64, 64)),
         transforms.ToTensor()
     ])
     transform = transform_train if train else transform_test
