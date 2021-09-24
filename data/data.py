@@ -232,3 +232,15 @@ def dummy_linear_points(shape): # Y = X*w
         Y[i] += 1 + 5 * np.random.normal()
     return X, Y
 
+def dummy_polynomial_points(shape, degree): # Y = X*w
+    row, col = shape
+    w = np.random.randn(col+1, 1)
+    X = -10 + 20*np.random.randn(row, col)
+    X_matrix = np.ones((row, 1))
+    for i in range(1, degree+1):
+        dummy = X**i
+        X_matrix = np.hstack((X, dummy))
+    Y = np.matmul(X_matrix, w)
+    for i in range(len(Y)):  # add some noise
+        Y[i] += 1 + 5 * np.random.normal()
+    return X, Y, degree
