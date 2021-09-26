@@ -231,4 +231,3 @@ def linear_points(shape): # Y = X*w
     for i in range(len(Y)):  # add some noise
         Y[i] += 1 + 5 * np.random.normal()
     return X, Y
-

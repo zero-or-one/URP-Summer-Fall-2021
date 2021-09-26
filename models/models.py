@@ -202,4 +202,5 @@ class ResNet18(nn.Module):
         out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
+        #print("output ", out.size())
         return out

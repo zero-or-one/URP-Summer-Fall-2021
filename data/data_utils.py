@@ -9,7 +9,9 @@ import torchvision
 import torchvision.transforms as transforms
 import torch.utils.data as data
 from matplotlib import pyplot as plt
-
+seed = 42
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 
 # get subset by indices
 # it exists by default, redefined for comfort
@@ -146,6 +148,62 @@ class AddNoise():
 
     def generate(self, size=[1, 32, 32]):
         return torch.randn(size) * self.std + self.mean
+
+class ForgetDataset(Dataset):
+    def __init__(self, data, targets, transform=None):
+        self.data = data
+        self.targets = torch.LongTensor(targets)
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x = self.data[index]
+        y = self.targets[index]
+
+        if self.transform:
+            x = Image.fromarray(self.data[index].astype(np.uint8).transpose(1, 2, 0))
+            x = self.transform(x)
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+
+def remove_random(ds, num): # dummy, but no time for good one
+    '''Remove random images from dataset'''
+    count = 0
+    imgs = []
+    labs = []
+    batch_size = ds.batch_size
+    for (img, lab) in ds:
+        for di in img:
+            imgs.append(di)
+            count+=1
+        for dl in lab:
+            labs.append(dl)
+        if count >= num-1:
+            break
+    dataset = ForgetDataset(imgs, labs)
+    dataloader = DataLoader(dataset, batch_size=batch_size)
+    return dataloader
+
+def remove_class(ds, class_id): # dump again
+    '''Remove class or several classes from dataset'''
+    forget_imgs = []
+    forget_labs = []
+    retain_imgs = []
+    retain_labs = []
+    for (img, lab) in ds:
+        for idx, dl in enumerate(lab):
+            if dl in class_id:
+                forget_labs.append(dl)
+                forget_imgs.append(img[idx])
+            else:
+                retain_labs.append(dl)
+                retain_imgs.append(img[idx])
+    forget = ForgetDataset(forget_imgs, forget_labs)
+    retain = ForgetDataset(retain_imgs, retain_labs)
+    forget = DataLoader(forget, batch_size=ds.batch_size)
+    retain = DataLoader(retain, batch_size=ds.batch_size)
+    return forget, retain
 '''
 def separate_data(ds, given=False, idxs=[], target=0, cuda=0):
     labels_all = []
