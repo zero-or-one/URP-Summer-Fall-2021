@@ -111,7 +111,7 @@ def neg_gradient(model, loss, optimizer, epochs, device, dataset, lossfn, train_
     print("[Logging in {}]".format(logger.index))
 
     for ep in range(epochs):
-        configure_learning_rate(optimizer, epoch)
+        #configure_learning_rate(optimizer, epoch)
         t = time.time()
         model.train()
 
@@ -139,7 +139,7 @@ def neg_gradient(model, loss, optimizer, epochs, device, dataset, lossfn, train_
                       lr=optimizer.param_groups[0]['lr'])
 
         print(f'Epoch number: {ep} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
-    filename = f"./checkpoints/{model.__class__.__name__}_{ep}.pth.tar"
+    filename = f"./checkpoints/{model.__class__.__name__}_{ep+1}.pth.tar"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
     print("Forget time is:", time.time() - start_time)
