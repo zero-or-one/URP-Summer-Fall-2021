@@ -12,6 +12,7 @@ class LinearRegression(torch.nn.Module):
         self.linear = torch.nn.Linear(input_size, output_size)
 
     def forward(self, x):
+        x = x.float()
         out = self.linear(x)
         return out
 

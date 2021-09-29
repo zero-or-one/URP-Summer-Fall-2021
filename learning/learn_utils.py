@@ -40,11 +40,11 @@ def set_loss(loss, cuda=None):
     - Kullback-Leibler divergence (kld)
     """
     if loss == 'mae':
-        loss_fn = nn.L1Loss
+        loss_fn = nn.L1Loss()
     elif loss == 'mse':
-        loss_fn = nn.MSELoss
+        loss_fn = nn.MSELoss()
     elif loss == 'nll':
-        loss_fn == nn.NLLLoss
+        loss_fn == nn.NLLLoss()
     elif loss == 'ce':
         loss_fn = nn.CrossEntropyLoss()
     elif loss == 'svm':

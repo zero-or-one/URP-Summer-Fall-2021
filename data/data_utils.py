@@ -138,7 +138,6 @@ def fashionMnist_transform(train=True):
     return transform
 
 class AddNoise():
-
     def __init__(self, mean=0., std=1., **kwargs):
         self.std = std
         self.mean = mean
@@ -149,6 +148,18 @@ class AddNoise():
 
     def generate(self, size=[1, 32, 32]):
         return torch.randn(size) * self.std + self.mean
+
+    def encode_data(self, ds):
+        imgs = []
+        labs = []
+        for img, label in ds:
+            for l, di in enumerate(img):
+                di = self.encodes(di)
+                imgs.append(di)
+                labs.append(label[l])
+        dataset = ForgetDataset(imgs, labs)
+        dataloader = DataLoader(dataset, batch_size=ds.batch_size)
+        return dataloader
 
 class ForgetDataset(Dataset):
     def __init__(self, data, targets, transform=None):
@@ -205,6 +216,7 @@ def remove_class(ds, class_id): # dump again
     forget = DataLoader(forget, batch_size=ds.batch_size)
     retain = DataLoader(retain, batch_size=ds.batch_size)
     return forget, retain
+
 '''
 def separate_data(ds, given=False, idxs=[], target=0, cuda=0):
     labels_all = []
