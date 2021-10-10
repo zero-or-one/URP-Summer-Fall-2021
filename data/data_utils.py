@@ -217,6 +217,23 @@ def remove_class(ds, class_id): # dump again
     retain = DataLoader(retain, batch_size=ds.batch_size)
     return forget, retain
 
+def combine_datasets(ds1, ds2): # dummy iterable approach
+    imgs = []
+    labs = []
+    for (img, lab) in ds1:
+        for di in img:
+            imgs.append(di)
+        for dl in lab:
+            labs.append(dl)
+    for (img, lab) in ds2:
+        for di in img:
+            imgs.append(di)
+        for dl in lab:
+            labs.append(dl)    
+    ds = ForgetDataset(imgs, labs)
+    ds = DataLoader(ds, batch_size=ds1.batch_size)
+    return ds
+    
 '''
 def separate_data(ds, given=False, idxs=[], target=0, cuda=0):
     labels_all = []

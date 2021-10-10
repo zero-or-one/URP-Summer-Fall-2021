@@ -86,6 +86,7 @@ class MLP(nn.Module):
         return nn.Sequential(*layer)
 
     def forward(self, x):
+        x = x.float()
         x = x.reshape(x.size(0), self.input_size)
         return self.layers(x)
 

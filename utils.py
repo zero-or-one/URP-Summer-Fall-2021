@@ -3,7 +3,7 @@ import numpy as np
 import random
 
 
-def set_seed(seed):
+def set_seed(seed=13):
     if seed is None:
         np.random.seed(None)
         seed = np.random.randint(1e5)
@@ -12,5 +12,6 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    print("SEED SET TO: ", seed)
 
 
