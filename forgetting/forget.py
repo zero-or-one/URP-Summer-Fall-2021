@@ -165,3 +165,4 @@ def neg_gradient(model, loss, optimizer, epochs, device, dataset, lossfn, train_
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
     print("Forget time is:", time.time() - start_time)
+
