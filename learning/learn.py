@@ -52,11 +52,11 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
 
 
 def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, scheduler=None,
-    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=-1, name=""):
+    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=-1, step_size=10, gamma=0.5, name=""):
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
     criterion = set_loss(loss)
-    scheduler = set_scheduler(scheduler, optimizer, step_size=3, gamma=0.1, last_epoch=-1)
+    scheduler = set_scheduler(scheduler, optimizer, step_size=step_size, gamma=gamma, last_epoch=-1)
 
     mkdir('logs')
     mkdir('checkpoints')
@@ -80,6 +80,8 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
             loss_val = logger.get('test')[-1]["loss"]
             #print(loss_val)
             early_stop_callback(loss_val)
+        if scheduler:
+            scheduler.step()
         print(f'Epoch number: {ep} \nEpoch Time: {np.round(time.time()-t,2)} sec')
         if early_stop_callback.early_stop:
             print("EARLY STOPPING")
