@@ -76,13 +76,14 @@ class MLP(nn.Module):
     def _make_layers(self):
         layer = []
         layer += [
-        Layer(self.input_size, self.hidden_size),
+        #Layer(self.input_size, self.hidden_size),
+        nn.Linear(self.input_size, self.hidden_size),
         self.activation]
         #layer += [self.activation]
         for i in range(self.num_layer - 2):
-            layer += [Layer(self.hidden_size, self.hidden_size)]
+            layer += [nn.Linear(self.hidden_size, self.hidden_size)]
             layer += [self.activation]
-        layer += [Layer(self.hidden_size, self.num_classes)]
+        layer += [nn.Linear(self.hidden_size, self.num_classes)]
         return nn.Sequential(*layer)
 
     def forward(self, x):

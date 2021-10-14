@@ -217,7 +217,7 @@ def remove_class(ds, class_id): # dump again
     retain = DataLoader(retain, batch_size=ds.batch_size)
     return forget, retain
 
-def combine_datasets(ds1, ds2): # dummy iterable approach
+def combine_datasets(ds1, ds2, shuffle=False): # dummy iterable approach
     imgs = []
     labs = []
     for (img, lab) in ds1:
@@ -231,7 +231,7 @@ def combine_datasets(ds1, ds2): # dummy iterable approach
         for dl in lab:
             labs.append(dl)    
     ds = ForgetDataset(imgs, labs)
-    ds = DataLoader(ds, batch_size=ds1.batch_size)
+    ds = DataLoader(ds, batch_size=ds1.batch_size, shuffle=shuffle)
     return ds
     
 '''

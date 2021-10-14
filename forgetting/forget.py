@@ -1,11 +1,20 @@
 import os
 import sys
+
 sys.path.append("../URP")
+path = ".."
+sys.path.append(path)
+sys.path.append(path + "/learning")
+sys.path.append(path + "/data")
+sys.path.append(path + "/models")
+sys.path.append(path + "/forgetting")
 from learning.learn_utils import *
 from learning.learn import *
-from utils import *
 import time
 import torch
+from data.data_utils import AddNoise, remove_random, remove_class, combine_datasets
+from learning.learn import *
+from forget_utils import *
 
 '''
 Methods I need to implement
@@ -21,7 +30,58 @@ Methods I need to implement
 
 '''
 
-def fine_tune(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, 
+###########################
+#    Proposed methods     #
+###########################
+
+def FD(class_id, mean, std, model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
+    scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="CFD"):
+    ''' Feature Destruction '''
+    forget_train, retain_train = remove_class(train_loader, [class_id])
+    forget_val, retain_val = remove_class(val_loader, [class_id])
+    noise = AddNoise(mean=mean, std=std)
+    noisy_forget = noise.encode_data(forget_train)
+    #noisy_retain = noise.encode_data(retain)
+    concat = combine_datasets(noisy_forget, retain_train)
+    print('-' * 20)
+    print("INITIAL Df PERFOMANCE")
+    _ = test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+             test_loader=forget_val, at_epoch=None)
+    print('-' * 20)
+    print("INITIAL Dr PERFOMANCE")
+    _ = test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+             test_loader=retain_val, at_epoch=None)
+    print('-' * 20)
+    print("FORGETTING PROCESS")
+    _ = fine_tune(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                  train_loader=concat, val_loader=forget_val,
+                  scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name='fine_tune')
+    print('-' * 20)
+    print('FINAL Df PERFOMANCE')
+    _ = test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+             test_loader=forget_val, at_epoch=None)
+    print('-' * 20)
+    print('FINAL Dr PERFOMANCE')
+    _ = test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+             test_loader=forget_val, at_epoch=None)
+
+
+def NIA(class_id, mean, std, model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
+    scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="NIA"):
+    ''' Negative Information Allocation '''
+    pass
+    # do we need to shuffle dataset???
+
+def forget_image():
+    pass
+
+
+
+#########################
+#    Simple methods     #
+#########################
+
+def fine_tune(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
     scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="fine_tune"): # and retrain
     start_time = time.time()
     train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
