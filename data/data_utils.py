@@ -77,6 +77,7 @@ def show_random(dataset, num):
             plt.axis('off')
             plt.imshow(img)
             plt.show()
+        break
 
 # Transforms
 def general_transforms(train=True):
