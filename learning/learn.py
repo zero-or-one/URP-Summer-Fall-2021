@@ -86,12 +86,12 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
         if early_stop_callback.early_stop:
             print("EARLY STOPPING")
             break
-    filename = f"./checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
+    filename = f"./learning/checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
     if curves:
         plot_curves(logger, bool(val_loader))
-    return model
+    #return model
 
 def test(model, loss, optimizer, device, dataset, lossfn, test_loader, at_epoch, name=""):
     model.to(device)
@@ -107,4 +107,8 @@ def test(model, loss, optimizer, device, dataset, lossfn, test_loader, at_epoch,
     model, _ = epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
             train_loader=test_loader, scheduler=None, weight_decay=0.0, epoch_num=at_epoch, train=False, logger=logger)
     print("FINISHED TESTING")
-    return model
+    #return model
+
+def predict(model, img):
+  img.unsqueeze_(0)
+  return torch.argmax(model(img))

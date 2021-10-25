@@ -180,6 +180,11 @@ class ForgetDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+    def __remove__(self, remove_list):
+        data = np.delete(self.data, remove_list, axis=0)
+        targets = np.delete(self.targets, remove_list, axis=0)
+        return data, targets
+
 def remove_random(ds, num): # dummy, but no time for good one
     '''Remove random images from dataset'''
     count = 0
@@ -234,7 +239,58 @@ def combine_datasets(ds1, ds2, shuffle=False): # dummy iterable approach
     ds = ForgetDataset(imgs, labs)
     ds = DataLoader(ds, batch_size=ds1.batch_size, shuffle=shuffle)
     return ds
-    
+
+def get_random_img(ds):
+    n_batch = len(ds)
+    rand_batch = int(np.random.random() * n_batch)
+    #imgs, labs = ds[rand_batch]
+    for i, (s_imgs, s_labs) in enumerate(ds):
+        if i < rand_batch:
+            continue
+        imgs, labs = s_imgs, s_labs
+        break
+    n_imgs = len(imgs)
+    rand_idx = int(np.random.random() * n_imgs)
+    img = imgs[rand_idx]
+    lab = labs[rand_idx]
+    return img, lab
+
+def get_random(ds, num):
+    imgs = []
+    labs = []
+    for i in range(num):
+        img, lab = get_random_img(ds)
+        imgs.append(img)
+        labs.append(lab)
+    dataset = ForgetDataset(imgs, labs)
+    dataloader = DataLoader(dataset, ds.batch_size)
+    return dataloader
+
+# Sorry, I don't have time to use efficient algorithms, let's go with straightforward instead
+def separate_random(ds, num):
+    got_imgs = []
+    got_labs = []
+    left_imgs = []
+    left_labs = []
+    max_id = len(ds) * ds.batch_size
+    rand_idxs = np.random.randint(0, max_id, num)
+    idx = 0
+    for imgs, labs in ds: # dummy
+        for i, img in enumerate(imgs):
+            lab = labs[i]
+            if idx in rand_idxs:
+                got_imgs.append(img)
+                got_labs.append(lab)
+            else:
+                left_imgs.append(img)
+                left_labs.append(lab)
+            idx+=1
+    got = ForgetDataset(got_imgs, got_labs)
+    left = ForgetDataset(left_imgs, left_labs)
+    got = DataLoader(got, ds.batch_size)
+    left = DataLoader(left, ds.batch_size)
+    return got, left
+
 '''
 def separate_data(ds, given=False, idxs=[], target=0, cuda=0):
     labels_all = []

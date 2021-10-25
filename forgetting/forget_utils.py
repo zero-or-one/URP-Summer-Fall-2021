@@ -18,6 +18,7 @@ class Encoder(nn.Module):
         self.hidden_size = hidden_size
         self.activation = activation
         self.layers = self._make_layers()
+        #self.model = model
 
     def _make_layers(self):
         layer = []
@@ -35,39 +36,34 @@ class Encoder(nn.Module):
     def forward(self, x):
         x = x.float()
         x = x.reshape(x.size(0), self.input_size)
-        return self.layers(x)
+        x = self.layers(x)
+        #x = self.model(x)
 
-def NIP(v1,v2):
+    '''
+    def freeze(self):
+        for param in self.layers.parameters():
+            param.requires_grad = False
+    '''
+
+def model_learning(model, unfreeze):
+    for param in model.parameters():
+        param.requires_grad = unfreeze
+    return model
+
+def nip(v1,v2):
     '''
 
     :param v1: prediction
     :param v2: actual scrubbing update
     :return: Normalized Inner Product between v1 and v2
     '''
-    nip = (np.inner(v1/np.linalg.norm(v1),v2/np.linalg.norm(v2)))
+    nip = (np.inner(v1/np.linalg.norm(v1), v2/np.linalg.norm(v2)))
     return nip
 
-def parameter_count(model):
-    count=0
-    for p in model.parameters():
-        count+=np.prod(np.array(list(p.shape)))
-    print(f'Total Number of Parameters: {count}')
-
-def vectorize_params(model):
-    param = []
-    for p in model.parameters():
-        param.append(p.data.view(-1).cpu().numpy())
-    return np.concatenate(param)
-
-def print_param_shape(model):
-    for k,p in model.named_parameters():
-        print(k,p.shape)
-
-def distance(model,model0):
+def distance(model, model0):
     distance=0
     normalization=0
     for (k, p), (k0, p0) in zip(model.named_parameters(), model0.named_parameters()):
-        space='  ' if 'bias' in k else ''
         current_dist=(p.data0-p0.data0).pow(2).sum().item()
         current_norm=p.data0.pow(2).sum().item()
         distance+=current_dist
@@ -77,32 +73,3 @@ def distance(model,model0):
     return 1.0*np.sqrt(distance/normalization)
 
 
-def delta_w_utils(model_init,dataloader, lossfn, dataset, num_classes, model, name='complete'):
-    model_init.eval()
-    dataloader = torch.utils.data.DataLoader(dataloader.dataset, batch_size=1, shuffle=False)
-    G_list = []
-    f0_minus_y = []
-    for idx, batch in enumerate(dataloader):#(tqdm(dataloader,leave=False)):
-        batch = [tensor.to(next(model_init.parameters()).device) for tensor in batch]
-        input, target = batch
-        if 'mnist' in dataset:
-            input = input.view(input.shape[0],-1)
-        target = target.cpu().detach().numpy()
-        output = model_init(input)
-        G_sample=[]
-        for cls in range(num_classes):
-            grads = torch.autograd.grad(output[0,cls],model_init.parameters(),retain_graph=True)
-            grads = np.concatenate([g.view(-1).cpu().numpy() for g in grads])
-            G_sample.append(grads)
-            G_list.append(grads)
-        if lossfn=='mse':
-            p = output.cpu().detach().numpy().transpose()
-            #loss_hess = np.eye(len(p))
-            target = 2*target-1
-            f0_y_update = p-target
-        elif lossfn=='ce':
-            p = torch.nn.functional.softmax(output,dim=1).cpu().detach().numpy().transpose()
-            p[target]-=1
-            f0_y_update = model.deepcopy(p)
-        f0_minus_y.append(f0_y_update)
-    return np.stack(G_list).transpose(), np.vstack(f0_minus_y)

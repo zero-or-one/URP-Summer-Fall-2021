@@ -1,4 +1,9 @@
-import numpy as np
+import copy
+import sys
+sys.path.append("../URP")
+from utils import *
+from tqdm import tqdm
+
 
 def parameter_count(model):
     count=0
@@ -16,148 +21,141 @@ def print_param_shape(model):
     for k,p in model.named_parameters():
         print(k,p.shape)
 
-def get_pdf(weights):
-    pass
+def get_pdf(p, num_classes, class_to_forget, is_base_dist=False, alpha=3e-6):
+    var = copy.deepcopy(1. / (p.grad2_acc + 1e-8))
+    var = var.clamp(max=1e3)
+    if p.size(0) == num_classes:
+        var = var.clamp(max=1e2)
+    var = alpha * var
 
-'''!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'''
-### Change it, place into forgetting later
-def lin_exact(X, Y, reg=1e-4):
-    """
-    Exact retraining using normal form of the parameters.
-    Solves min sum[((theta^T x_i - y_i)^2)/2] + reg * (||theta||^2)/2
-    Normal form: (X^T X + reg * I)theta = X^T Y.
-    Args:
-        X: (n x d matrix) Covariate matrix
-        Y: (n x 1 vector) Response vector
-        reg: (float) Per-data point regularization parameter
-    Returns:
-        theta: (d x 1 vector) Fitted coefficients
-    """
-    n = len(Y)
-    d = len(X[0, :])
-    theta = np.linalg.solve(np.matmul(X.T, X) + reg * np.eye(d), np.matmul(X.T, Y))
-    return theta
-
-def lin_inf(X, Y, theta, ind, invhess=None, reg=1e-4):
-    """
-    Approximate retraining via infuence method
-    Args:
-        X: (n x d matrix) Covariate matrix
-        Y: (n x 1 vector) Response vector
-        theta: (d x 1 vector) Current value of parameters to be updated
-        ind: (k x 1 list) List of indices to be removed
-        invhess: (d x d matrix, optional) Pre-computed inverse Hessian
-        reg: (float) Fixed regularization strength
-    Returns:
-        updated: (d x 1 vector) Updated parameters
-    """
-    n = len(Y)
-    k = len(ind)
-    d = len(theta)
-
-    # Note: We don't need to add the regularization term to the gradient because
-    # we want grad[L_{\k}(theta_full)].
-    grad = np.zeros(d)
-    for i in ind:
-        grad += (np.dot(X[i, :], theta) - Y[i]) * X[i, :]
-
-    if invhess is not None:
-        updated = theta + np.matmul(invhess, grad)
+    if p.ndim > 1:
+        var = var.mean(dim=1, keepdim=True).expand_as(p).clone()
+    if not is_base_dist:
+        mu = copy.deepcopy(p.data0.clone())
     else:
-        updated = theta + np.linalg.solve(np.matmul(X.T, X) + reg * np.eye(d), grad)
-    return updated
+        mu = copy.deepcopy(p.data0.clone())
+    if p.size(0) == num_classes and class_to_forget is None:
+        mu[class_to_forget] = 0
+        var[class_to_forget] = 0.0001
+    if p.size(0) == num_classes:
+        # Last layer
+        var *= 10
+    elif p.ndim == 1:
+        # BatchNorm
+        var *= 10
+    #         var*=1
+    return mu, var
 
-def lin_res(X, Y, theta, ind, H=None, reg=1e-4):
-    """
-    Approximate retraining via the projective residual update.
-    Args:
-        X: (n x d matrix) Covariate matrix
-        Y: (n x 1 vector) Response vector
-        theta: (d x 1 vector) Current value of parameters to be updated
-        ind: (k x 1 list) List of indices to be removed
-        H: (n x n matrix, optional) Hat matrix X (X^T X)^{-1} X^T
-    Returns:
-        updated: (d x 1 vector) Updated parameters
-    """
-    d = len(X[0])
-    k = len(ind)
+def l2_distance(weights, weights_retrain):
+    l2 = np.sum(weights**2 - weights_retrain**2)
+    l2 = np.sqrt(l2)
+    return l2
 
-    # Step 1: Compute LKO predictions
-    LKO = LKO_pred(X, Y, ind, H, reg)
+def kl_divergence(mu0, var0, mu1, var1):
+    return ((mu1 - mu0).pow(2)/var0 + var1/var0 - torch.log(var1/var0) - 1).sum()
+'''
+def kl_divergence(p, q):
+    return np.sum(p[i] * np.log2(p[i]/q[i]) for i in range(len(p)))
+'''
 
-    # Step 2: Eigendecompose B
-    # 2.I
-    U, C = gram_schmidt(X[ind, :])
-    # 2.II
-    Cmatrix = np.matmul(C.T, C)
-    eigenval, a = np.linalg.eigh(Cmatrix)
-    V = np.matmul(a.T, U)
 
-    # Step 3: Perform the update
-    # 3.I
-    grad = np.zeros(d)
-    for i in range(k):
-        grad += (np.dot(X[ind[i], :], theta) - LKO[i]) * X[ind[i], :]
-    # 3.II
-    step = np.zeros(d)
-    for i in range(k):
-        factor = 1 / eigenval[i] if eigenval[i] > 1e-10 else 0
-        step += factor * np.dot(V[i, :], grad) * V[i, :]
-    # 3.III
-    update = theta - step
-    return update
+def get_variance(model1, model2, alpha):
+    delta_w_s = []
+    delta_w_m0 = []
 
-def gram_schmidt(X):
-    """
-    Uses numpy's qr factorization method to perform Gram-Schmidt.
-    Args:
-        X: (k x d matrix) X[i] = i-th vector
-    Returns:
-        U: (k x d matrix) U[i] = i-th orthonormal vector
-        C: (k x k matrix) Coefficient matrix, C[i] = coeffs for X[i], X = CU
-    """
-    (k, d) = X.shape
-    if k <= d:
-        q, r = np.linalg.qr(np.transpose(X))
+    for i, (k, p) in enumerate(model1.named_parameters()):
+        mu, var = get_pdf(p, False, alpha=alpha)
+        delta_w_s.append(var.view(-1))
+
+    for i, (k, p) in enumerate(model2.named_parameters()):
+        mu, var = get_pdf(p, False, alpha=alpha)
+        delta_w_m0.append(var.view(-1))
+    return torch.cat(delta_w_s), torch.cat(delta_w_m0)
+
+
+def get_metrics(model,dataloader,criterion,samples_correctness=False,use_bn=False,delta_w=None,scrub_act=False):
+    activations=[]
+    predictions=[]
+    if use_bn:
+        model.train()
+        dataloader = torch.utils.data.DataLoader(retain_loader.dataset, batch_size=128, shuffle=True)
+        for i in range(10):
+            for batch_idx, (data, target) in enumerate(dataloader):
+                data, target = data.to(args.device), target.to(args.device)
+                output = model(data)
+    dataloader = torch.utils.data.DataLoader(dataloader.dataset, batch_size=1, shuffle=False)
+    model.eval()
+    metrics = AverageMeter()
+    mult = 0.5 if args.lossfn=='mse' else 1
+    for batch_idx, (data, target) in enumerate(dataloader):
+        data, target = data.to(args.device), target.to(args.device)
+        if args.lossfn=='mse':
+            target=(2*target-1)
+            target = target.type(torch.cuda.FloatTensor).unsqueeze(1)
+        if 'mnist' in args.dataset:
+            data=data.view(data.shape[0],-1)
+        output = model(data)
+        loss = mult*criterion(output, target)
+        if samples_correctness:
+            activations.append(torch.nn.functional.softmax(output,dim=1).cpu().detach().numpy().squeeze())
+            predictions.append(get_error(output,target))
+        metrics.update(n=data.size(0), loss=loss.item(), error=get_error(output, target))
+    if samples_correctness:
+        return metrics.avg,np.stack(activations),np.array(predictions)
     else:
-        q, r = np.linalg.qr(np.transpose(X), mode='complete')
-    U = np.transpose(q)
-    C = np.transpose(r)
-    return U, C
+        return metrics.avg
 
 
-def LKO_pred(X, Y, ind, H=None, reg=1e-4):
-    """
-    Computes the LKO model's prediction values on the left-out points.
-    Args:
-        X: (n x d matrix) Covariate matrix
-        Y: (n x 1 vector) Response vector
-        ind: (k x 1 list) List of indices to be removed
-        H: (n x n matrix, optional) Hat matrix X (X^T X)^{-1} X^T
-    Returns:
-        LKO: (k x 1 vector) Retrained model's predictions on X[i], i in ind
-    """
-    n = len(Y)
-    k = len(ind)
-    d = len(X[0, :])
-    if H is None:
-        H = np.matmul(X, np.linalg.solve(np.matmul(X.T, X) + reg * np.eye(d), X.T))
+def activations_predictions(model,dataloader,name, log_dict):
+    criterion = torch.nn.CrossEntropyLoss()
+    metrics,activations,predictions=get_metrics(model,dataloader,criterion,True)
+    print(f"{name} -> Loss:{np.round(metrics['loss'],3)}, Error:{metrics['error']}")
+    log_dict[f"{name}_loss"]=metrics['loss']
+    log_dict[f"{name}_error"]=metrics['error']
+    return activations,predictions
 
-    LOO = np.zeros(k)
-    for i in range(k):
-        idx = ind[i]
-        # This is the LOO residual y_i - \hat{y}^{LOO}_i
-        LOO[i] = (Y[idx] - np.matmul(H[idx, :], Y)) / (1 - H[idx, idx])
+def predictions_distance(l1,l2,name, log_dict):
+    dist = np.sum(np.abs(l1-l2))
+    print(f"Predictions Distance {name} -> {dist}")
+    log_dict[f"{name}_predictions"]=dist
 
-    # S = I - T from the paper
-    S = np.eye(k)
-    for i in range(k):
-        for j in range(k):
-            if j != i:
-                idx_i = ind[i]
-                idx_j = ind[j]
-                S[i, j] = -H[idx_i, idx_j] / (1 - H[idx_i, idx_i])
+def activations_distance(a1,a2,name, log_dict):
+    dist = np.linalg.norm(a1-a2,ord=1,axis=1).mean()
+    print(f"Activations Distance {name} -> {dist}")
+    log_dict[f"{name}_activations"]=dist
 
-    LKO = np.linalg.solve(S, LOO)
+def save_dict(m0_name, log_dict):
+    np.save(f"logs/{m0_name.split('/')[1].split('.')[0]}.npy", log_dict)
 
-    return Y[ind] - LKO
+
+'''
+def delta_w_utils(model_init, dataloader, lossfn, dataset, num_classes, model, name='complete'):
+    model_init.eval()
+    dataloader = torch.utils.data.DataLoader(dataloader.dataset, batch_size=1, shuffle=False)
+    G_list = []
+    f0_minus_y = []
+    for idx, batch in enumerate(dataloader):#(tqdm(dataloader,leave=False)):
+        batch = [tensor.to(next(model_init.parameters()).device) for tensor in batch]
+        input, target = batch
+        if 'mnist' in dataset:
+            input = input.view(input.shape[0],-1)
+        target = target.cpu().detach().numpy()
+        output = model_init(input)
+        G_sample=[]
+        for cls in range(num_classes):
+            grads = torch.autograd.grad(output[0,cls],model_init.parameters(),retain_graph=True)
+            grads = np.concatenate([g.view(-1).cpu().numpy() for g in grads])
+            G_sample.append(grads)
+            G_list.append(grads)
+        if lossfn=='mse':
+            p = output.cpu().detach().numpy().transpose()
+            #loss_hess = np.eye(len(p))
+            target = 2*target-1
+            f0_y_update = p-target
+        elif lossfn=='ce':
+            p = torch.nn.functional.softmax(output,dim=1).cpu().detach().numpy().transpose()
+            p[target]-=1
+            f0_y_update = model.deepcopy(p)
+        f0_minus_y.append(f0_y_update)
+    return np.stack(G_list).transpose(), np.vstack(f0_minus_y)
+'''
