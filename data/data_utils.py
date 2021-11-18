@@ -223,15 +223,17 @@ def remove_class(ds, class_id): # dump again
     retain = DataLoader(retain, batch_size=ds.batch_size)
     return forget, retain
 
-def combine_datasets(ds1, ds2, shuffle=False): # dummy iterable approach
+def combine_datasets(ds1, ds2, shuffle=False, device='cuda'): # dummy iterable approach
     imgs = []
     labs = []
     for (img, lab) in ds1:
+        img, lab = img.to(device), lab.to(device)
         for di in img:
             imgs.append(di)
         for dl in lab:
             labs.append(dl)
     for (img, lab) in ds2:
+        img, lab = img.to(device), lab.to(device)
         for di in img:
             imgs.append(di)
         for dl in lab:

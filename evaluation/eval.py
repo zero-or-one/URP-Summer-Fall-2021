@@ -5,15 +5,16 @@ import numpy as np
 from eval_utils import *
 from sklearn.svm import SVC
 import seaborn as sns
-sys.path.append("../URP")
+import torch.nn as nn
+#sys.path.append("../URP")
 
 
 def distance(model, model0):
     distance=0
     normalization=0
     for (k, p), (k0, p0) in zip(model.named_parameters(), model0.named_parameters()):
-        current_dist=(p.data0-p0.data0).pow(2).sum().item()
-        current_norm=p.data0.pow(2).sum().item()
+        current_dist=(p-p0).pow(2).sum().item()
+        current_norm=p.pow(2).sum().item()
         distance+=current_dist
         normalization+=current_norm
     print(f'Distance: {np.sqrt(distance)}')

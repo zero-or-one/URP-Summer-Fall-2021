@@ -8,7 +8,7 @@ sys.path.append("../URP")
 from utils import *
 
 
-def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, scheduler=None, weight_decay=0.0, epoch_num=10, train=True, otype="other"):
+def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, logger, scheduler=None, weight_decay=0.0, epoch_num=10, train=True, otype="other", retain_graph=False):
     if train:
         model.train()
     else:
@@ -30,7 +30,7 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
                 target = target.float()
             loss = mult * criterion(output, target) + regularization(model, weight_decay, l2=True)
             optimizer.zero_grad()
-            loss.backward()
+            loss.backward(retain_graph=retain_graph)
             optimizer.step()
         else:
             output = model(data)
@@ -52,7 +52,8 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
 
 
 def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, scheduler=None,
-    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=-1, step_size=10, gamma=0.5, name=""):
+    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=-1, step_size=10, gamma=0.5, name="", retain_graph=False):
+    set_seed()
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
     criterion = set_loss(loss)
@@ -72,7 +73,7 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
         t = time.time()
         #configure_learning_rate(optimizer, epoch)
         model, _ = epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
-               train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True, logger=logger)
+               train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True, logger=logger, retain_graph=retain_graph)
         if (val_loader is not None):
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
@@ -86,7 +87,7 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
         if early_stop_callback.early_stop:
             print("EARLY STOPPING")
             break
-    filename = f"./learning/checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
+    filename = f"./checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
     if curves:
@@ -94,6 +95,7 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
     #return model
 
 def test(model, loss, optimizer, device, dataset, lossfn, test_loader, at_epoch, name=""):
+    set_seed()
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), 0.001, 0.001, 0.8)
     
@@ -109,6 +111,8 @@ def test(model, loss, optimizer, device, dataset, lossfn, test_loader, at_epoch,
     print("FINISHED TESTING")
     #return model
 
-def predict(model, img):
+def predict(model, img, device):
   img.unsqueeze_(0)
+  model = model.to(device)
+  img = img.to(device)
   return torch.argmax(model(img))

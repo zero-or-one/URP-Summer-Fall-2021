@@ -21,7 +21,7 @@ def print_param_shape(model):
     for k,p in model.named_parameters():
         print(k,p.shape)
 
-def get_pdf(p, num_classes, class_to_forget, is_base_dist=False, alpha=3e-6):
+def get_pdf(p, num_classes=10, class_to_forget=0, is_base_dist=False, alpha=3e-6):
     var = copy.deepcopy(1. / (p.grad2_acc + 1e-8))
     var = var.clamp(max=1e3)
     if p.size(0) == num_classes:

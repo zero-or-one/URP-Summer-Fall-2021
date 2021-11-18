@@ -9,12 +9,13 @@ sys.path.append(path + "/data")
 sys.path.append(path + "/models")
 
 
-from data.data_utils import *
+from data_utils import *
 #from learning.learn import *
 
 #from data_utils import *
 #from learn import *
 from forget_utils import *
+from copy import deepcopy
 
 '''
 Methods I need to implement
@@ -47,7 +48,11 @@ class FD(object):
         if imglab is None:
             imglab = get_random_img(ds)
         img, lab = imglab
-        plab = predict(model, img)
+        img0 = torch.clone(img)
+        #img = img.to(device)
+        #lab = lab.to(device)
+        #model = model.to(device)
+        plab = predict(model, img, device)
         print('-' * 20)
         print("True label is: ", lab)
         print("Predicted label is: ", plab)
@@ -61,18 +66,18 @@ class FD(object):
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
                  test_loader=ds, at_epoch=None)
         noisy_img = self.noise.encodes(img)
-        data = ForgetDataset(noisy_img, lab)
+        data = ForgetDataset(noisy_img, [lab])
         dataloader = DataLoader(data, batch_size=1)
         print('-' * 20)
         print("FORGETTING PROCESS")
-        fine_tune(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+        fine_tune_helper(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
                       train_loader=dataloader, val_loader=ds,
                       scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=self.name)
         print('-' * 20)
         print("FINAL D PERFOMANCE")
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
                  test_loader=ds, at_epoch=None)
-        plab = predict(model, img)
+        plab = predict(model, img0, device)
         print('-' * 20)
         print("True label is: ", lab)
         print("Predicted label is: ", plab)
@@ -88,28 +93,27 @@ class FD(object):
             subset, left = separate_random(forget_train, img_num)
             forget = self.noise.encode_data(subset)
             retain = combine_datasets(left, retain_train)
-            train = combine_datasets(forget, retain)
         else:
             subset, retain = separate_random(train_loader, img_num)
             forget = self.noise.encode_data(subset)
-            train = combine_datasets(forget, retain)
+        train = combine_datasets(forget, retain)
         print('-' * 20)
         print("INITIAL Df PERFOMANCE")
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
-                 test_loader=forget, at_epoch=None)
+                 test_loader=subset, at_epoch=None)
         print('-' * 20)
         print("INITIAL Dr PERFOMANCE")
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
                  test_loader=retain, at_epoch=None)
         print('-' * 20)
         print("FORGETTING PROCESS")
-        fine_tune(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+        fine_tune_helper(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
                       train_loader=train, val_loader=retain,
                       scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=self.name)
         print('-' * 20)
         print('FINAL Df PERFOMANCE')
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
-                 test_loader=forget, at_epoch=None)
+                 test_loader=subset, at_epoch=None)
         print('-' * 20)
         print('FINAL Dr PERFOMANCE')
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
@@ -133,7 +137,7 @@ class FD(object):
                  test_loader=retain_val, at_epoch=None)
         print('-' * 20)
         print("FORGETTING PROCESS")
-        fine_tune(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+        fine_tune_helper(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
                       train_loader=concat, val_loader=forget_val,
                       scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=self.name)
         print('-' * 20)
@@ -149,9 +153,10 @@ class FD(object):
 
 class NIA(object):
     ''' Negative Information Allocation '''
-    def __init__(self):
+    def __init__(self, input_size=1024, num_layer=2, hidden_size=1024):
         self.mean = 0
         self.std = 0
+        self.encoder_model = Encoder(input_size=input_size, hidden_size=hidden_size, num_layer=num_layer)
 
     def forget_class(self, model, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
         scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="NIA"):
@@ -170,18 +175,19 @@ class NIA(object):
         print('-' * 20)
         print("TRAINING ENCODER")
         #!!!!!!!!
-        encoder_model = Encoder()
-        train_encoder(encoder_model, model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
-                      train_loader=forget_train, val_loader=forget_val,
-                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=self.name)
+        model = train_encoder(encoder_model=self.encoder_model, model=model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                      train_forget=forget_train, val_forget=forget_val, train_retain=retain_train, val_retain=retain_val,
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=name)
         print('-' * 20)
         print("FORGETTING PROCESS")
         #encoder_model = model_learning(encoder_model, True)
-        noisy_forget = encoder_model(forget_train)
-        concat = combine_datasets(noisy_forget, retain_train)
-        fine_tune(encoder_model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+        noisy_data = self.encoder_model.predict(forget_train, device, dataset)
+        #noisy_forget = ForgetDataset(noisy_data, target)
+        #noisy_forget = DataLoader(dataset, retain_train.batch_size)
+        concat = combine_datasets(noisy_data, retain_train, shuffle=True, device=device)
+        fine_tune_helper(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
                       train_loader=concat, val_loader=forget_val,
-                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=self.name)
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=name, retain_graph=True)
         print('-' * 20)
         print('FINAL Df PERFOMANCE')
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
@@ -190,6 +196,7 @@ class NIA(object):
         print('FINAL Dr PERFOMANCE')
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
                  test_loader=retain_val, at_epoch=None)
+        return model
 
 
 class BL(object):
@@ -219,11 +226,11 @@ def train_encoder(encoder_model, model, loss, optimizer, epochs, device, dataset
     for ep in range(epochs):
         t = time.time()
         #configure_learning_rate(optimizer, epoch)
-        model, _ = encoder_epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, encoder_model=encoder_model,
+        encoder_model, _ = encoder_epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, encoder_model=encoder_model,
                                   lossfn=lossfn, forget_loader=train_forget, retain_loader=train_retain, scheduler=scheduler,
                                   weight_decay=0.0, epoch_num=ep, train=True, logger=logger)
         if (val_forget is not None):
-            model, _ = encoder_epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset,
+            encoder_model, _ = encoder_epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset,
                                       model=model, encoder_model=encoder_model,
                                       lossfn=lossfn, forget_loader=val_forget, retain_loader=val_retain,
                                       scheduler=scheduler,
@@ -237,12 +244,13 @@ def train_encoder(encoder_model, model, loss, optimizer, epochs, device, dataset
         if early_stop_callback.early_stop:
             print("EARLY STOPPING")
             break
-    filename = f"./learning/checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
+    filename = f"./checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
     save_state(encoder_model, optimizer, filename)
     print("FINISHED TRAINING")
     if curves:
         plot_curves(logger, bool(val_forget))
     model = model_learning(model, True)
+    return model
 
 def encoder_epoch(criterion, optimizer, device, dataset, model, encoder_model, lossfn, forget_loader, retain_loader, logger, scheduler=None, weight_decay=0.0, epoch_num=10, train=True, otype="other"):
     if train:
@@ -253,20 +261,27 @@ def encoder_epoch(criterion, optimizer, device, dataset, model, encoder_model, l
     mult=0.5 if lossfn=='mse' else 1
     metrics = AverageMeter()
 
-    train_loader = (forget_loader, retain_loader)
-    for batch_idx, ((data_forget, target_forget), (data_retain, target_retain)) in enumerate(train_loader):
+    for batch_idx, (forg, ret) in enumerate(zip(forget_loader, retain_loader)):
+        (data_forget, target_forget) = forg
+        (data_retain, target_retain) = ret
         data_forget, target_forget = data_forget.to(device), target_forget.to(device)
         data_retain, target_retain = data_retain.to(device), target_retain.to(device)
 
-        target = target_forget + target_retain
+        target = torch.cat((target_forget, target_retain), 0)
 
         if 'mnist' in dataset:
             data_forget = data_forget.view(data_forget.shape[0],-1)
             data_retain = data_retain.view(data_retain.shape[0], -1)
 
         if train:
-            encoded = encoder_model(data_forget)
-            both = encoded + data_retain
+            encoded = encoder_model(data_forget, dataset)
+            if dataset == 'mnist':
+              encoded = encoded.reshape(data_forget.size(0),data_forget.size(1))
+            else:
+              encoded = encoded.reshape(data_forget.size(0),data_forget.size(1), data_forget.size(2), data_forget.size(3))
+            #print(encoded.shape)
+            #print(data_forget.shape)
+            both = torch.cat((encoded, data_retain), 0)
             output = model(both)
             if otype == "float":
                 output = output.float()
@@ -276,15 +291,22 @@ def encoder_epoch(criterion, optimizer, device, dataset, model, encoder_model, l
             loss.backward()
             optimizer.step()
         else:
-            encoded = encoder_model(data_forget)
-            both = encoded + data_retain
+            encoded = encoder_model(data_forget, dataset)
+            #encoded = encoded.reshape(data_forget.size(0),data_forget.size(1), data_forget.size(2), data_forget.size(3))
+            both = torch.cat((encoded, data_retain), 0)
+            #print(model)
+            #print("in", both.shape)
             output = model(both)
+            #print("out", output)
+            #print("outsize", output.shape)
+            #print("targ", target)
+            #print("targsize", target.shape)
             if otype == "float":
                 loss = mult * criterion(output.float(), target.float()) + regularization(encoder_model, weight_decay, l2=True)
             else:
                 loss = mult * criterion(output, target) + regularization(encoder_model, weight_decay, l2=True)
 
-    metrics.update(n=data.size(0), loss=loss.item(), error=get_error(output, target))
+    metrics.update(n=both.size(0), loss=loss.item(), error=get_error(output, target))
     if epoch_num is not None:
         log_metrics('train' if train else 'test', metrics, epoch_num)
         logger.append('train' if train else 'test', epoch=epoch_num, loss=metrics.avg['loss'], error=metrics.avg['error'],
@@ -300,15 +322,160 @@ def encoder_epoch(criterion, optimizer, device, dataset, model, encoder_model, l
 #    Simple methods     #
 #########################
 
-def fine_tune(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
-    scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="fine_tune"): # and retrain
+def retrain(model, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="retrain"):
+        
+        forget_train, retain_train = remove_class(train_loader, [class_id])
+        forget_val, retain_val = remove_class(val_loader, [class_id])
+
+        print('-' * 20)
+        print("INITIAL Df PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print("INITIAL Dr PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+        print('-' * 20)
+        print("RETRAINING")
+        # reset the model
+        model.apply(weight_reset)
+        fine_tune_helper(model=model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                      train_loader=retain_train, val_loader=forget_val,
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=name, patience=100)
+        print('-' * 20)
+        print('FINAL Df PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print('FINAL Dr PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)        
+    
+def fine_tune(model, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="finetune"):
+        
+        forget_train, retain_train = remove_class(train_loader, [class_id])
+        forget_val, retain_val = remove_class(val_loader, [class_id])
+
+        print('-' * 20)
+        print("INITIAL Df PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print("INITIAL Dr PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+        print('-' * 20)
+        print("FINETUNING")
+        fine_tune_helper(model=model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                      train_loader=retain_train, val_loader=forget_val,
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=name)
+        print('-' * 20)
+        print('FINAL Df PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print('FINAL Dr PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+
+def random_labels(model, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="random_labels"):
+        
+        forget_train, retain_train = remove_class(train_loader, [class_id])
+        forget_val, retain_val = remove_class(val_loader, [class_id])
+
+        print('-' * 20)
+        print("INITIAL Df PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print("INITIAL Dr PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+        print('-' * 20)
+        print("RANDOMING")
+        random_labels_helper(model=model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                      train_loader=retain_train, val_loader=forget_val,
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=name)
+        print('-' * 20)
+        print('FINAL Df PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print('FINAL Dr PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+
+def hiding(model, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="random_labels"):
+        
+        forget_train, retain_train = remove_class(train_loader, [class_id])
+        forget_val, retain_val = remove_class(val_loader, [class_id])
+
+        print('-' * 20)
+        print("INITIAL Df PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print("INITIAL Dr PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+        print('-' * 20)
+        print("HIDING")
+        hiding_helper(model_base=model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                      train_loader=retain_train, val_loader=forget_val,
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=name)
+        print('-' * 20)
+        print('FINAL Df PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print('FINAL Dr PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+                 
+def neg_gradient(model, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="random_labels"):
+        
+        forget_train, retain_train = remove_class(train_loader, [class_id])
+        forget_val, retain_val = remove_class(val_loader, [class_id])
+
+        print('-' * 20)
+        print("INITIAL Df PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print("INITIAL Dr PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+        print('-' * 20)
+        print("ASCENDING")
+        neg_gradient_helper(model=model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                      train_loader=forget_train, val_loader=forget_val,
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=name)
+        print('-' * 20)
+        print('FINAL Df PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=forget_val, at_epoch=None)
+        print('-' * 20)
+        print('FINAL Dr PERFOMANCE')
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain_val, at_epoch=None)
+
+                 
+# HELPERS
+def fine_tune_helper(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
+    scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="", retain_graph=False, patience=10): # and retrain
     start_time = time.time()
     train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
-    scheduler, weight_decay, lr, momentum, name)
+    scheduler, weight_decay, lr, momentum, name, retain_graph=retain_graph, patience=patience, min_delta=-1.5)
     print("Forget time is:", time.time() - start_time)
-
-def random_labels(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, scheduler=None,
+    
+def random_labels_helper(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, scheduler=None,
     weight_decay=0.0, lr=0.01, momentum=0.9, name="random_lables"):
+    set_seed()
     start_time = time.time()
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
@@ -355,13 +522,14 @@ def random_labels(model, loss, optimizer, epochs, device, dataset, lossfn, train
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
         print(f'Epoch number: {ep} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
-    filename = f"./learning/checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
+    filename = f"./checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
     print("Forget time is:", time.time() - start_time)
 
-def hiding(model_base, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, 
+def hiding_helper(model_base, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, 
     scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="hiding"):
+    set_seed()
     start_time = time.time()
     #for p in model_base.parameters():
     #    if p.requires_grad:
@@ -387,12 +555,13 @@ def hiding(model_base, loss, optimizer, epochs, device, dataset, lossfn, train_l
     #print(in_size[1])
     model = torch.nn.Sequential(*modules, torch.nn.Linear(int(in_size[1]), int(out_size[1]-1)))
     train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
-    scheduler, weight_decay, lr, momentum, name)
+    scheduler, weight_decay, lr, momentum, name, patience=10, min_delta=-1.5)
     print("Forget time is:", time.time() - start_time)
     return model
 
-def neg_gradient(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, 
-    scheduler=None, weight_decay=0.0, lr=0.001, momentum=0.9, name="neg_gradient"):
+def neg_gradient_helper(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, 
+    scheduler=None, weight_decay=0.0, lr=0.001, momentum=0.9, name="neg_gradient", curves=True):
+    set_seed()
     start_time = time.time()
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
@@ -440,7 +609,7 @@ def neg_gradient(model, loss, optimizer, epochs, device, dataset, lossfn, train_
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
                   logger=logger)
         print(f'Epoch number: {ep} :\n Epoch Time: {np.round(time.time()-t,2)} sec')
-    filename = f"./learning/checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
+    filename = f"./checkpoints/{model.__class__.__name__}_{name}{ep+1}.pth.tar"
     save_state(model, optimizer, filename)
     print("FINISHED TRAINING")
     print("Forget time is:", time.time() - start_time)
