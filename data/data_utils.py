@@ -139,16 +139,54 @@ def fashionMnist_transform(train=True):
     return transform
 
 class AddNoise():
-    def __init__(self, mean=0., std=1., **kwargs):
+    '''
+    'gauss'     Gaussian-distributed additive noise.
+    'poisson'   Poisson-distributed noise generated from the data.
+    's&p'       Replaces random pixels with 0 or 1.
+    'speckle'   Multiplicative noise using out = image + n*image,where
+                n is uniform noise with specified mean & variance.
+    '''
+    def __init__(self, mean=0., std=1., noise_type='gauss', s_vs_p=0.5, amount=0.5, **kwargs):
         self.std = std
         self.mean = mean
+        self.s_vs_p = s_vs_p
+        self.amount = amount
+        self.noise_type = noise_type
         super().__init__(**kwargs)
 
     def encodes(self, x):
-        return x + torch.randn(x.size()) * self.std + self.mean
+        if self.noise_type == 'gauss':
+            out = x + torch.randn(x.size()) * self.std + self.mean
+        elif self.noise_type == "speckle":
+            row, col, ch = x.shape
+            gauss = np.random.randn(row, col, ch)
+            gauss = gauss.reshape(row, col, ch)
+            out = x + x * gauss
+        elif self.noise_type == 's&p':
+            _, row, col = x.shape
+            out = np.copy(x)
+            number_of_pixels = np.random.randint(13, int(row * col * self.amount * self.s_vs_p))
+            for i in range(number_of_pixels):
+                y_coord = np.random.randint(0, row - 1)
+                x_coord = np.random.randint(0, col - 1)
+                out[0][y_coord][x_coord] = 1
+            number_of_pixels = np.random.randint(13, int(row * col * self.amount * self.s_vs_p))
+            for i in range(number_of_pixels):
+                y_coord = np.random.randint(0, row - 1)
+                x_coord = np.random.randint(0, col - 1)
+                out[0][y_coord][x_coord] = 0
+        elif self.noise_type == "poisson":
+            vals = len(np.unique(x))
+            vals = 2 ** np.ceil(np.log2(vals))
+            out = np.random.poisson(x * vals) / float(vals)
+        else:
+            raise ValueError
+        return out
 
     def generate(self, size=[1, 32, 32]):
-        return torch.randn(size) * self.std + self.mean
+        if self.noise_type == 'gauss':
+            return torch.randn(size) * self.std + self.mean
+        raise NotImplementedError
 
     def encode_data(self, ds):
         imgs = []

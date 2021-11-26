@@ -118,6 +118,7 @@ def get_membership_attack_data(retain_loader, forget_loader, test_loader, model)
     return X_f, Y_f, X_r, Y_r
 
 def get_membership_attack_prob(retain_loader, forget_loader, test_loader, model):
+    # ????
     X_f, Y_f, X_r, Y_r = get_membership_attack_data(retain_loader, forget_loader, test_loader, model)
     clf = SVC(C=3, gamma='auto', kernel='rbf')
     # clf = LogisticRegression(class_weight='balanced',solver='lbfgs',multi_class='multinomial')
@@ -149,6 +150,59 @@ def membership_attack(retain_loader, forget_loader, test_loader, model):
     return prob
 
 
+def compute_forgetting(task_no, dataloader, dset_size, use_gpu):
+    """
+    Inputs
+    1) task_no: The task number on which you want to compute the forgetting
+    2) dataloader: The dataloader that feeds in the data to the model
+    Outputs
+    1) forgetting: The amount of forgetting undergone by the model
+    Function: Computes the "forgetting" that the model has on the
+    """
+
+    # get the results file
+    store_path = os.path.join(os.getcwd(), "models", "Task_" + str(task_no))
+    model_path = os.path.join(os.getcwd(), "models")
+    device = torch.device("cuda:0" if use_gpu else "cpu")
+
+    # get the old performance
+    file_object = open(os.path.join(store_path, "performance.txt"), 'r')
+    old_performance = file_object.read()
+    file_object.close()
+
+    # load the model for inference
+    model = model_inference(task_no, use_gpu=False)
+    model.to(device)
+
+    running_corrects = 0
+
+    for data in dataloader:
+        input_data, labels = data
+        del data
+
+        if (use_gpu):
+            input_data = input_data.to(device)
+            labels = labels.to(device)
+
+        else:
+            input_data = Variable(input_data)
+            labels = Variable(labels)
+
+        output = model.tmodel(input_data)
+        del input_data
+
+        _, preds = torch.max(output, 1)
+
+        running_corrects += torch.sum(preds == labels.data)
+        del preds
+        del labels
+
+    epoch_accuracy = running_corrects.double() / dset_size
+
+    old_performance = float(old_performance)
+    forgetting = epoch_accuracy.item() - old_performance
+
+    return forgetting
 '''
 def feature_injection_test(X, Y, remove_sizes, num_repeats=50, reg=1e-4, outliers_to_remove=None):
 
