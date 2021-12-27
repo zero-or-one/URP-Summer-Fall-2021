@@ -2,8 +2,12 @@ import os
 import sys
 sys.path.append("../URP")
 path = ".."
-from learning.learn_utils import *
-from learning.learn import *
+sys.path.append(path + "/learning")
+#from learning.learn_utils import *
+#from learning.learn import *
+from learn_utils import *
+from learn import *
+sys.path.append(path)
 from utils import *
 import numpy as np
 import time
@@ -53,7 +57,7 @@ class Encoder(nn.Module):
         x = x.reshape(x.size(0), x.size(1), l, -1)
         return x
 
-    def predict(self, dataloader, device, dataset):
+    def predict(self, dataloader, device, dataset, squeeze=False):
       out = []
       tar = []
       for batch_idx, (data, target) in enumerate(dataloader):
@@ -63,7 +67,9 @@ class Encoder(nn.Module):
             encoded = encoded.reshape(encoded.size(0), 32, 32)
           for i in range(len(encoded)):
             uni = encoded[i]
-            out.append(uni.unsqueeze(0))
+            if not squeeze:
+                uni = uni.unsqueeze(0)
+            out.append(uni)
             tar.append(target[i])
       dataset = ForgetDataset(out, tar)
       loader = DataLoader(dataset, dataloader.batch_size)
@@ -122,13 +128,17 @@ def weight_reset(model):
 
 
 #------------------------------------------------------------------------------------------
+'''
 import numpy as np
-import keras.backend as K
+import tensorflow.keras.backend as K
 from keras.regularizers import Regularizer
+import tensorflow as tf
 
+tf.compat.v1.disable_eager_execution()
 
 def computer_fisher(model, imgset, num_sample=30):
     f_accum = []
+    tf.compat.v1.disable_eager_execution()
     for i in range(len(model.weights)):
         f_accum.append(np.zeros(K.int_shape(model.weights[i])))
     f_accum = np.array(f_accum)
@@ -136,6 +146,8 @@ def computer_fisher(model, imgset, num_sample=30):
         img_index = np.random.randint(imgset.shape[0])
         for m in range(len(model.weights)):
             grads = K.gradients(K.log(model.output), model.weights)[m]
+            #grads = K.GradientTape(K.log(model.output), model.weights)[m]
+            #grads = tf.GradientTape(K.log(model.output), model.weights)[m]
             result = K.function([model.input], [grads])
             f_accum[m] += np.square(result([np.expand_dims(imgset[img_index], 0)])[0])
     f_accum /= num_sample
@@ -155,3 +167,4 @@ class ewc_reg(Regularizer):
 
     def get_config(self):
         return {'Lambda': float(self.Lambda)}
+'''

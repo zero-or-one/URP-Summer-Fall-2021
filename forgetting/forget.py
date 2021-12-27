@@ -35,11 +35,9 @@ Methods I need to implement
 
 class FD(object):
     ''' Feature Destruction '''
-    def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
+    def __init__(self, mean=0, std=0.2, noise_type='gauss'):
         self.name = "FD"
-        self.noise = AddNoise(mean=self.mean, std=self.std)
+        self.noise = AddNoise(mean=mean, std=std, noise_type=noise_type, s_vs_p=0.5, amount=0.5)
 
     def forget_class(self, model, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
         scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9):
@@ -97,7 +95,7 @@ class FD(object):
         print('-' * 20)
         print("FORGETTING PROCESS")
         fine_tune_helper(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
-                      train_loader=train, val_loader=retain,
+                      train_loader=train, val_loader=forget,
                       scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=self.name)
         print('-' * 20)
         print('FINAL Df PERFOMANCE')
@@ -108,12 +106,12 @@ class FD(object):
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
                  test_loader=retain, at_epoch=None)
 
-    def forget_image(self, model, imglab, ds, loss, optimizer, epochs, device, dataset, lossfn,
+    def forget_image(self, model, imglab, ds, ds_test, loss, optimizer, epochs, device, dataset, lossfn,
         scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9):
         '''Forget single image'''
         set_seed()
         if imglab is None:
-            imglab = get_random_img(ds)
+            imglab = get_random_img(ds_test)
         img, lab = imglab
         img0 = torch.clone(img)
         #img = img.to(device)
@@ -158,7 +156,7 @@ class NIA(object):
         self.encoder_model = Encoder(input_size=input_size, hidden_size=hidden_size, num_layer=num_layer)
 
     def forget_class(self, model, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader,
-        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="NIA_class"):
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, name="NIA_class_", squeeze=True):
 
         forget_train, retain_train = remove_class(train_loader, [class_id])
         forget_val, retain_val = remove_class(val_loader, [class_id])
@@ -179,7 +177,7 @@ class NIA(object):
         print('-' * 20)
         print("FORGETTING PROCESS")
         #encoder_model = model_learning(encoder_model, True)
-        noisy_data = self.encoder_model.predict(forget_train, device, dataset)
+        noisy_data = self.encoder_model.predict(forget_train, device, dataset, squeeze=squeeze)
         #noisy_forget = ForgetDataset(noisy_data, target)
         #noisy_forget = DataLoader(dataset, retain_train.batch_size)
         concat = combine_datasets(noisy_data, retain_train, shuffle=True, device=device)
@@ -228,23 +226,77 @@ class NIA(object):
         print('-' * 20)
         print("FORGETTING PROCESS")
         #encoder_model = model_learning(encoder_model, True)
-        noisy_data = self.encoder_model.predict(forget, device, dataset)
+        squeeze = False if 'mnist' in dataset else True
+        noisy_data = self.encoder_model.predict(forget, device, dataset, squeeze=squeeze)
         #noisy_forget = ForgetDataset(noisy_data, target)
         #noisy_forget = DataLoader(dataset, retain_train.batch_size)
         concat = combine_datasets(noisy_data, retain, shuffle=True, device=device)
         fine_tune_helper(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
-                      train_loader=concat, val_loader=subset,
+                      train_loader=concat, val_loader=forget,
                       scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name=name, retain_graph=True)
         print('-' * 20)
         print('FINAL Df PERFOMANCE')
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
-                 test_loader=subset, at_epoch=None)
+                 test_loader=forget, at_epoch=None)
         print('-' * 20)
         print('FINAL Dr PERFOMANCE')
         test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
                  test_loader=retain, at_epoch=None)
         return model
-
+        
+    def forget_image(self, model, imglab, ds, ds_test, loss, optimizer, epochs, device, dataset, lossfn,
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9):
+        '''Forget single image'''
+        set_seed()
+        if imglab is None:
+            imglab = get_random_img(ds_test)
+        img, lab = imglab
+        img0 = torch.clone(img)
+        #img = img.to(device)
+        #lab = lab.to(device)
+        #model = model.to(device)
+        plab = predict(model, img, device)
+        print('-' * 20)
+        print("True label is: ", lab)
+        print("Predicted label is: ", plab)
+        if plab != lab:
+            print('-' * 20)
+            print("PREDICTION IS WRONG, CHOOSE OTHER IMAGE")
+            return
+            #sys.exit()
+        print('-' * 20)
+        print("INITIAL D PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=ds, at_epoch=None)
+        noisy_img = torch.clone(img)
+        data = ForgetDataset(noisy_img, [lab])
+        dataloader = DataLoader(data, batch_size=1)
+        print('-' * 20)
+        
+        print("TRAINING ENCODER")
+        model = train_encoder(encoder_model=self.encoder_model, model=model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                      train_forget=dataloader, val_forget=None, train_retain=ds, val_retain=None,
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name='whatever')
+        print('-' * 20)
+        print("FORGETTING PROCESS")
+        #encoder_model = model_learning(encoder_model, True)
+        squeeze = False if 'mnist' in dataset else True
+        noisy_data = self.encoder_model.predict(dataloader, device, dataset, squeeze=squeeze)
+        #noisy_forget = ForgetDataset(noisy_data, target)
+        #noisy_forget = DataLoader(dataset, retain_train.batch_size)
+        concat = combine_datasets(noisy_data, ds, shuffle=True, device=device)
+        fine_tune_helper(model, loss=loss, optimizer=optimizer, epochs=epochs, device=device, dataset=dataset, lossfn=None,
+                      train_loader=concat, val_loader=ds,
+                      scheduler=scheduler, weight_decay=weight_decay, lr=lr, momentum=momentum, name="name", retain_graph=True)
+        print('-' * 20)
+        print("FINAL D PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=ds, at_epoch=None)
+        plab = predict(model, img0, device)
+        print('-' * 20)
+        print("True label is: ", lab)
+        print("Predicted label is: ", plab)
+        
 class BL(object):
     '''Backward learning'''
     def __init__(self):
@@ -313,7 +365,7 @@ class BL(object):
             if (forget_val is not None):
                 epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model,
                       lossfn=lossfn,
-                      train_loader=forget_val, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
+                      train_loader=forget_val, scheduler=scheduler, weight_decay=0.0, epoch_num=2*ep, train=False,
                       logger=logger)
             print(f'Epoch number: {2*ep} :\n Epoch Time: {np.round(time.time() - t, 2)} sec')
             t = time.time()
@@ -324,23 +376,211 @@ class BL(object):
             if (val_loader is not None):
                 epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model,
                       lossfn=lossfn,
-                      train_loader=retain_val, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,
+                      train_loader=retain_val, scheduler=scheduler, weight_decay=0.0, epoch_num=2*ep+1, train=False,
                       logger=logger)
             print(f'Epoch number: {2 * ep + 1} :\n Epoch Time: {np.round(time.time() - t, 2)} sec')
-        filename = f"./checkpoints/{model.__class__.__name__}_{name}{epochs + 1}.pth.tar"
+        filename = f"./checkpoints/{model.__class__.__name__}_{name}_{epochs + 1}.pth.tar"
         save_state(model, optimizer, filename)
         print("FINISHED TRAINING")
         print("Forget time is:", time.time() - start_time)
         print('-' * 20)
         print('FINAL Df PERFOMANCE')
-        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+        test(model=model, loss='ce', lossfn=lossfn, optimizer='adam', device=device, dataset=dataset,
              test_loader=forget_val, at_epoch=None)
         print('-' * 20)
         print('FINAL Dr PERFOMANCE')
-        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+        test(model=model, loss='ce', lossfn=lossfn, optimizer='adam', device=device, dataset=dataset,
              test_loader=retain_val, at_epoch=None)
 
 
+    def forget_subset(self, model, img_num, class_id, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9, forget_val=None):
+        '''Forget random subset of data, either from single class or not.
+           May be not working with this method'''
+        set_seed()
+        name="NIA_subset"
+        if class_id:
+            forget_train, retain_train = remove_class(train_loader, [class_id])
+            #forget_val, retain_val = remove_class(val_loader, [class_id])
+            subset, left = separate_random(forget_train, img_num)
+            forget = subset
+            retain = combine_datasets(left, retain_train)
+        else:
+            subset, retain = separate_random(train_loader, img_num)
+            forget = subset
+        #train = combine_datasets(forget, retain)
+        print('-' * 20)
+        print("INITIAL Df PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=subset, at_epoch=None)
+        print('-' * 20)
+        print("INITIAL Dr PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=retain, at_epoch=None)
+        print('-' * 20)
+        print("FORGETTING PROCESS")
+        set_seed()
+        start_time = time.time()
+        model.to(device)
+        optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
+        criterion = set_loss(loss)
+        scheduler = set_scheduler(scheduler, optimizer, step_size=3, gamma=0.1, last_epoch=-1)
+
+        mkdir('logs')
+        mkdir('checkpoints')
+
+        logger = Logger(index=str(model.__class__.__name__) + '_training')
+        # logger['args'] = args
+        logger['checkpoint'] = os.path.join('models/', logger.index + '.pth')
+        logger['checkpoint_step'] = os.path.join('models/', logger.index + '_{}.pth')
+        print("[Logging in {}]".format(logger.index))
+
+        for ep in range(epochs//2): # double epoch
+            # configure_learning_rate(optimizer, epoch)
+            t = time.time()
+            model.train()
+
+            mult = 0.5 if lossfn == 'mse' else 1
+            metrics = AverageMeter()
+
+            for batch_idx, (data, target) in enumerate(forget):
+                data, target = data.to(device), target.to(device)
+
+                if 'mnist' in dataset:
+                    data = data.view(data.shape[0], -1)
+                optimizer.zero_grad()
+                output = model(data)
+                loss = mult * criterion(output, target) + regularization(model, weight_decay, l2=True)
+                # this one is changed
+                ascent_loss = make_ascent(loss)
+                ascent_loss.backward()
+                optimizer.step()
+
+            metrics.update(n=data.size(0), loss=loss.item(), error=get_error(output, target))
+            log_metrics('train', metrics, ep)
+            logger.append('train', epoch=ep, loss=metrics.avg['loss'],
+                          error=metrics.avg['error'],
+                          lr=optimizer.param_groups[0]['lr'])
+            if (forget_val is not None):
+                epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model,
+                      lossfn=lossfn,
+                      train_loader=forget_val, scheduler=scheduler, weight_decay=0.0, epoch_num=2*ep, train=False,
+                      logger=logger)
+            print(f'Epoch number: {2*ep} :\n Epoch Time: {np.round(time.time() - t, 2)} sec')
+            t = time.time()
+            epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model,
+                             lossfn=lossfn,
+                             train_loader=retain, scheduler=scheduler, weight_decay=0.0, epoch_num=2*ep+1, train=True,
+                             logger=logger, retain_graph=False)
+            print(f'Epoch number: {2 * ep + 1} :\n Epoch Time: {np.round(time.time() - t, 2)} sec')
+        filename = f"./checkpoints/{model.__class__.__name__}_{name}_{epochs + 1}.pth.tar"
+        save_state(model, optimizer, filename)
+        print("FINISHED TRAINING")
+        print("Forget time is:", time.time() - start_time)
+        print('-' * 20)
+        print('FINAL Df PERFOMANCE')
+        test(model=model, loss='ce', lossfn=lossfn, optimizer='adam', device=device, dataset=dataset,
+             test_loader=forget, at_epoch=None)
+        print('-' * 20)
+        print('FINAL Dr PERFOMANCE')
+        test(model=model, loss='ce', lossfn=lossfn, optimizer='adam', device=device, dataset=dataset,
+             test_loader=retain, at_epoch=None)
+
+    def forget_image(self, model, imglab, ds, ds_test, loss, optimizer, epochs, device, dataset, lossfn,
+        scheduler=None, weight_decay=0.0, lr=0.01, momentum=0.9):
+        '''Forget single image'''
+        set_seed()
+        if imglab is None:
+            imglab = get_random_img(ds_test)
+        img, lab = imglab
+        img0 = torch.clone(img)
+        #img = img.to(device)
+        #lab = lab.to(device)
+        #model = model.to(device)
+        plab = predict(model, img, device)
+        print('-' * 20)
+        print("True label is: ", lab)
+        print("Predicted label is: ", plab)
+        if plab != lab:
+            print('-' * 20)
+            print("PREDICTION IS WRONG, CHOOSE OTHER IMAGE")
+            return
+            #sys.exit()
+        print('-' * 20)
+        print("INITIAL D PERFOMANCE")
+        test(model=model, loss=loss, lossfn=lossfn, optimizer=optimizer, device=device, dataset=dataset,
+                 test_loader=ds, at_epoch=None)
+        noisy_img = torch.clone(img)#self.noise.encodes(img)
+        data = ForgetDataset(noisy_img, [lab])
+        forget = DataLoader(data, batch_size=1)
+        retain = ds
+        print('-' * 20)
+        print("FORGETTING PROCESS")
+        set_seed()
+        start_time = time.time()
+        model.to(device)
+        optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
+        criterion = set_loss(loss)
+        scheduler = set_scheduler(scheduler, optimizer, step_size=3, gamma=0.1, last_epoch=-1)
+
+        mkdir('logs')
+        mkdir('checkpoints')
+
+        logger = Logger(index=str(model.__class__.__name__) + '_training')
+        # logger['args'] = args
+        logger['checkpoint'] = os.path.join('models/', logger.index + '.pth')
+        logger['checkpoint_step'] = os.path.join('models/', logger.index + '_{}.pth')
+        print("[Logging in {}]".format(logger.index))
+
+        for ep in range(epochs//2): # double epoch
+            # configure_learning_rate(optimizer, epoch)
+            t = time.time()
+            model.train()
+
+            mult = 0.5 if lossfn == 'mse' else 1
+            metrics = AverageMeter()
+
+            for batch_idx, (data, target) in enumerate(forget):
+                data, target = data.to(device), target.to(device)
+
+                if 'mnist' in dataset:
+                    data = data.view(data.shape[0], -1)
+                optimizer.zero_grad()
+                output = model(data)
+                loss = mult * criterion(output, target) + regularization(model, weight_decay, l2=True)
+                # this one is changed
+                ascent_loss = make_ascent(loss)
+                ascent_loss.backward()
+                optimizer.step()
+
+            metrics.update(n=data.size(0), loss=loss.item(), error=get_error(output, target))
+            log_metrics('train', metrics, ep)
+            logger.append('train', epoch=ep, loss=metrics.avg['loss'],
+                          error=metrics.avg['error'],
+                          lr=optimizer.param_groups[0]['lr'])
+            print(f'Epoch number: {2*ep} :\n Epoch Time: {np.round(time.time() - t, 2)} sec')
+            t = time.time()
+            epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model,
+                             lossfn=lossfn,
+                             train_loader=retain, scheduler=scheduler, weight_decay=0.0, epoch_num=2*ep+1, train=True,
+                             logger=logger, retain_graph=False)
+            print(f'Epoch number: {2 * ep + 1} :\n Epoch Time: {np.round(time.time() - t, 2)} sec')
+        name='img_forget'
+        filename = f"./checkpoints/{model.__class__.__name__}_{name}_{epochs + 1}.pth.tar"
+        save_state(model, optimizer, filename)
+        print("FINISHED TRAINING")
+
+        print('-' * 20)
+        print("FINAL D PERFOMANCE")
+        test(model=model, loss='ce', lossfn=lossfn, optimizer='adam', device=device, dataset=dataset,
+                 test_loader=ds, at_epoch=None)
+        plab = predict(model, img0, device)
+        print('-' * 20)
+        print("True label is: ", lab)
+        print("Predicted label is: ", plab)
+        
+        
+#---------------------------------------------------        
 def train_encoder(encoder_model, model, loss, optimizer, epochs, device, dataset, lossfn, train_forget, val_forget,  train_retain, val_retain,
                   scheduler=None, weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7,
                   min_delta=-1, step_size=10, gamma=0.5, name=""):
@@ -588,7 +828,7 @@ def neg_gradient(model, class_id, loss, optimizer, epochs, device, dataset, loss
                  test_loader=retain_val, at_epoch=None)
         print('-' * 20)
         print("ASCENDING")
-        if ver1 = True:
+        if ver1 == True:
             neg_grad = neg_gradient_helper_ver1
         else:
             neg_grad = neg_gradient_helper_ver2

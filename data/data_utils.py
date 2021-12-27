@@ -162,6 +162,8 @@ class AddNoise():
             gauss = np.random.randn(row, col, ch)
             gauss = gauss.reshape(row, col, ch)
             out = x + x * gauss
+            out = out.type(torch.FloatTensor)
+            out = out.cuda()
         elif self.noise_type == 's&p':
             _, row, col = x.shape
             out = np.copy(x)
@@ -176,9 +178,12 @@ class AddNoise():
                 x_coord = np.random.randint(0, col - 1)
                 out[0][y_coord][x_coord] = 0
         elif self.noise_type == "poisson":
-            vals = len(np.unique(x))
-            vals = 2 ** np.ceil(np.log2(vals))
-            out = np.random.poisson(x * vals) / float(vals)
+            vals = self.std#len(np.unique(x))
+            #vals = 2 ** np.ceil(np.log2(vals))
+            out = torch.from_numpy(np.random.poisson(np.absolute(x * vals)) / float(vals))
+            out = x + out
+            out = out.type(torch.FloatTensor)
+            out = out.cuda()
         else:
             raise ValueError
         return out

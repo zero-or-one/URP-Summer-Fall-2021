@@ -5,6 +5,7 @@ import sys
 import inspect
 import time
 sys.path.append("../URP")
+sys.path.append("..")
 from utils import *
 
 
@@ -52,7 +53,7 @@ def epoch(criterion, optimizer, device, dataset, model, lossfn, train_loader, lo
 
 
 def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader, val_loader, scheduler=None,
-    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=-1, step_size=10, gamma=0.5, name="", retain_graph=False):
+    weight_decay=0.0, lr=0.001, momentum=0.9, curves=True, patience=7, min_delta=-1, step_size=10, gamma=0.5, name="", retain_graph=False, otype='other'):
     set_seed()
     model.to(device)
     optimizer = set_optimizer(optimizer, model.parameters(), lr, weight_decay, momentum)
@@ -73,7 +74,7 @@ def train(model, loss, optimizer, epochs, device, dataset, lossfn, train_loader,
         t = time.time()
         #configure_learning_rate(optimizer, epoch)
         model, _ = epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
-               train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True, logger=logger, retain_graph=retain_graph)
+               train_loader=train_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=True, logger=logger, retain_graph=retain_graph, otype=otype)
         if (val_loader is not None):
             epoch(criterion=criterion, optimizer=optimizer, device=device, dataset=dataset, model=model, lossfn=lossfn,
                   train_loader=val_loader, scheduler=scheduler, weight_decay=0.0, epoch_num=ep, train=False,

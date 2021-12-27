@@ -9,7 +9,7 @@ import torch.nn as nn
 #sys.path.append("../URP")
 
 
-def distance(model, model0):
+def distance_old(model, model0):
     distance=0
     normalization=0
     for (k, p), (k0, p0) in zip(model.named_parameters(), model0.named_parameters()):
@@ -21,17 +21,51 @@ def distance(model, model0):
     print(f'Normalized Distance: {1.0*np.sqrt(distance/normalization)}')
     return np.sqrt(distance)
 
-def KL(modelf, model, alpha=1e-6):
+def distance(model, model0):
+    distance=0
+    normalization=0
+    for (k, p), (k0, p0) in zip(model.named_parameters(), model0.named_parameters()):
+        space='  ' if 'bias' in k else ''
+        current_dist=(p.data0-p0.data0).pow(2).sum().item()
+        current_norm=p.data0.pow(2).sum().item()
+        distance+=current_dist
+        normalization+=current_norm
+    print(f'Distance: {np.sqrt(distance)}')
+    print(f'Normalized Distance: {1.0*np.sqrt(distance/normalization)}')
+    return 1.0*np.sqrt(distance/normalization)
+    #return distance
+    
+def KL(modelf, model,  num_classes=10, alpha=1e-6):
     # Computes the amount of information not forgotten at all layers using the given alpha
     total_kl = 0
     for (k, p), (k0, p0) in zip(modelf.named_parameters(), model.named_parameters()):
-        mu0, var0 = get_pdf(p, False, alpha=alpha)
+        mu0, var0 = get_pdf(p, num_classes, False, alpha=alpha)
         mu1, var1 = get_pdf(p0, True, alpha=alpha)
         kl = kl_divergence(mu0, var0, mu1, var1).item()
         total_kl += kl
         print(k, f'{kl:.1f}')
     print("Total:", total_kl)
     return total_kl
+
+def activations_predictions(model,dataloader,dataset):
+    criterion = torch.nn.CrossEntropyLoss()
+    metrics,activations,predictions=get_metrics(model,dataloader,criterion,True)
+    print(f"{name} -> Loss:{np.round(metrics['loss'],3)}, Error:{metrics['error']}")
+    log_dict[f"{name}_loss"]=metrics['loss']
+    log_dict[f"{name}_error"]=metrics['error']
+    return activations,predictions
+    
+def predictions_distance(l1,l2,name):
+    dist = np.sum(np.abs(l1-l2))
+    print(f"Predictions Distance {name} -> {dist}")
+    log_dict[f"{name}_predictions"]=dist
+    
+def activations_distance(a1,a2,name):
+    dist = np.linalg.norm(a1-a2,ord=1,axis=1).mean()
+    print(f"Activations Distance {name} -> {dist}")
+    log_dict[f"{name}_activations"]=dist
+    
+
 
 def test_activations(model_scrubf, modelf0, delta_w_s, delta_w_m0, data_loader, \
                      loss_fn=nn.CrossEntropyLoss(), \
@@ -88,9 +122,55 @@ def test_activations(model_scrubf, modelf0, delta_w_s, delta_w_m0, data_loader, 
 
     return metrics.avg
 
+def get_variance(model1,model2,alpha,seed=1):
+    
+    delta_w_s = []
+    delta_w_m0 = []
+    
+    for i, (k,p) in enumerate(model1.named_parameters()):
+        mu, var = get_mean_var(p, False, alpha=alpha)
+        delta_w_s.append(var.view(-1))
+
+    for i, (k,p) in enumerate(model2.named_parameters()):
+        mu, var = get_mean_var(p, False, alpha=alpha)
+        delta_w_m0.append(var.view(-1))
+
+    return torch.cat(delta_w_s), torch.cat(delta_w_m0)
+    
 
 def entropy(p, dim=-1, keepdim=False):
     return -torch.where(p > 0, p * p.log(), p.new([0.0])).sum(dim=dim, keepdim=keepdim)
+
+
+import matplotlib
+def plot_info(ax,df,information_list,title,no_barplot):
+    
+    if no_barplot:
+        sns.lineplot(x="info", y="error",data=df,ci='sd',ax=ax)
+        ax.set(xscale="log")#,yscale='log')
+        ax.set_xlabel('Remaining Information (NATs)',size=16)
+        ax.set_ylabel('Test Error (%)',size=16)
+        ax.set_title(title,size=16)
+        ax.tick_params(axis="y", labelsize=16)
+        ax.tick_params(axis="x", labelsize=16) 
+    else:
+        y_pos = range(len(information_list))
+        ax.grid(zorder=0)
+        ax.xaxis.grid(False)
+        ax.yaxis.grid(True)
+        ax.set_axisbelow(True)
+        ax.bar(y_pos, information_list, align='center', color=matplotlib.cm.get_cmap('tab10')(0.95), width=0.5,capsize=5)
+        ax.set_title('Information in Activations',size=18)
+        ax.set_facecolor('whitesmoke')
+        ax.tick_params(axis="y", labelsize=18)
+        ax.set_xticks(y_pos)
+        ax.set_xticklabels(labels=labels, size=18, rotation=45)
+        ylabel='NATs'
+        ax.set_ylabel(ylabel,size=18)
+        ax.set_ylim(bottom=-0.001)
+        
+    ax.set_facecolor(np.array([231,231,240])/256)#'whitesmoke')
+    ax.grid(color='white')
 
 
 def collect_prob(data_loader, model):
@@ -203,6 +283,9 @@ def compute_forgetting(task_no, dataloader, dset_size, use_gpu):
     forgetting = epoch_accuracy.item() - old_performance
 
     return forgetting
+
+
+
 '''
 def feature_injection_test(X, Y, remove_sizes, num_repeats=50, reg=1e-4, outliers_to_remove=None):
 
