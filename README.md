@@ -1,7 +1,5 @@
-# Undergraduate Research Program (URP)
-
-## Learn to forget: Realizing data removal in Machine Learning Models
-### Abstract
+# Learn to forget: Realizing data removal in Machine Learning Models
+## Abstract
 The project proposes and analyzes several ways of removing information from a machine learning system. Algorithms delete requested data from a model making it behave like it never interacted with this data before; whereas their complexity overtakes the straightforward retraining from scratch. The two proposed methods encode the target dataset in a way that once fed into the network, it destroys the filters containing local information about itself while preserving the global features. The other algorithm builds on converging into the final loss curve by performing iterative updates. Experiments proved that developed methods work with deep neural networks on regression and classification tasks and can be applied to other problems. Furthermore, the careful evaluation shows their superiority over trivial forgetting algorithms and equality with recently published successful cases.
 
 ## Reference
